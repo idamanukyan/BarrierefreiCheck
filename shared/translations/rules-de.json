@@ -1,0 +1,95 @@
+{
+  "_comment": "German translations for axe-core accessibility rules with BFSG mapping",
+  "_version": "0.1.0",
+  "rules": {
+    "color-contrast": {
+      "rule_id": "color-contrast",
+      "wcag_criteria": ["1.4.3"],
+      "wcag_level": "AA",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I",
+      "title_de": "Unzureichender Farbkontrast",
+      "description_de": "Der Kontrast zwischen Vordergrund- und Hintergrundfarbe ist für normale Textgröße zu gering. Für Text kleiner als 18pt (oder 14pt fett) muss das Kontrastverhältnis mindestens 4.5:1 betragen.",
+      "impact_de": "Nutzer mit Sehbeeinträchtigungen, Farbenblindheit oder ältere Menschen können den Text möglicherweise nicht lesen.",
+      "fix_de": "Erhöhen Sie den Kontrast auf mindestens 4.5:1. Verwenden Sie einen Kontrastrechner wie den WebAIM Contrast Checker.",
+      "code_example": "/* Vorher: Kontrast 2.5:1 */\ncolor: #999;\nbackground: #fff;\n\n/* Nachher: Kontrast 12.6:1 */\ncolor: #333;\nbackground: #fff;"
+    },
+    "image-alt": {
+      "rule_id": "image-alt",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I Nr. 1a",
+      "title_de": "Bild ohne Alternativtext",
+      "description_de": "Bilder müssen einen Alternativtext (alt-Attribut) haben, der den Inhalt oder Zweck des Bildes beschreibt.",
+      "impact_de": "Blinde und sehbehinderte Nutzer, die Screenreader verwenden, können nicht erkennen, was das Bild zeigt oder wofür es steht.",
+      "fix_de": "Fügen Sie dem img-Element ein beschreibendes alt-Attribut hinzu. Bei dekorativen Bildern verwenden Sie alt=\"\".",
+      "code_example": "<!-- Vorher -->\n<img src=\"produkt.jpg\">\n\n<!-- Nachher: Informatives Bild -->\n<img src=\"produkt.jpg\" alt=\"Rotes Kleid mit Blumenmuster, Größe M\">\n\n<!-- Dekoratives Bild -->\n<img src=\"dekoration.jpg\" alt=\"\">"
+    },
+    "label": {
+      "rule_id": "label",
+      "wcag_criteria": ["1.3.1", "3.3.2"],
+      "wcag_level": "A",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I Nr. 1c",
+      "title_de": "Formularfeld ohne Beschriftung",
+      "description_de": "Formularfelder müssen eine programmatisch verknüpfte Beschriftung (Label) haben, damit Nutzer wissen, welche Eingabe erwartet wird.",
+      "impact_de": "Screenreader-Nutzer können nicht erkennen, welche Eingabe in das Feld gehört. Die Bedienung wird erheblich erschwert.",
+      "fix_de": "Verknüpfen Sie ein label-Element mit dem Formularfeld über das for-Attribut oder verwenden Sie aria-label.",
+      "code_example": "<!-- Vorher -->\n<input type=\"email\">\n\n<!-- Nachher: Mit Label -->\n<label for=\"email\">E-Mail-Adresse</label>\n<input type=\"email\" id=\"email\">\n\n<!-- Alternative: aria-label -->\n<input type=\"email\" aria-label=\"E-Mail-Adresse\">"
+    },
+    "link-name": {
+      "rule_id": "link-name",
+      "wcag_criteria": ["2.4.4", "4.1.2"],
+      "wcag_level": "A",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I Nr. 1b, 1c",
+      "title_de": "Link ohne erkennbaren Text",
+      "description_de": "Links müssen einen erkennbaren, beschreibenden Text haben, damit Nutzer wissen, wohin der Link führt.",
+      "impact_de": "Screenreader-Nutzer hören nur 'Link' ohne weitere Information. Der Linkzweck ist nicht erkennbar.",
+      "fix_de": "Fügen Sie beschreibenden Linktext hinzu oder verwenden Sie aria-label für Icon-Links.",
+      "code_example": "<!-- Vorher: Nicht aussagekräftig -->\n<a href=\"/angebote\">Hier klicken</a>\n\n<!-- Nachher: Beschreibend -->\n<a href=\"/angebote\">Aktuelle Sonderangebote ansehen</a>\n\n<!-- Icon-Link mit aria-label -->\n<a href=\"/warenkorb\" aria-label=\"Zum Warenkorb\">\n  <svg>...</svg>\n</a>"
+    },
+    "button-name": {
+      "rule_id": "button-name",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I Nr. 1d",
+      "title_de": "Schaltfläche ohne erkennbaren Namen",
+      "description_de": "Schaltflächen (Buttons) müssen einen erkennbaren Namen haben, damit Nutzer wissen, welche Aktion ausgelöst wird.",
+      "impact_de": "Screenreader-Nutzer können die Funktion der Schaltfläche nicht erkennen.",
+      "fix_de": "Fügen Sie Text zur Schaltfläche hinzu oder verwenden Sie aria-label.",
+      "code_example": "<!-- Vorher -->\n<button><svg>X</svg></button>\n\n<!-- Nachher -->\n<button aria-label=\"Dialog schließen\">\n  <svg>X</svg>\n</button>"
+    },
+    "html-has-lang": {
+      "rule_id": "html-has-lang",
+      "wcag_criteria": ["3.1.1"],
+      "wcag_level": "A",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I Nr. 1c",
+      "title_de": "Fehlende Sprachangabe",
+      "description_de": "Das html-Element muss ein lang-Attribut haben, das die Hauptsprache der Seite angibt.",
+      "impact_de": "Screenreader können die Seite nicht in der korrekten Sprache vorlesen. Die Aussprache kann unverständlich sein.",
+      "fix_de": "Fügen Sie dem html-Element das lang-Attribut mit dem korrekten Sprachcode hinzu.",
+      "code_example": "<!-- Vorher -->\n<html>\n\n<!-- Nachher: Deutsche Seite -->\n<html lang=\"de\">\n\n<!-- Englische Seite -->\n<html lang=\"en\">"
+    },
+    "document-title": {
+      "rule_id": "document-title",
+      "wcag_criteria": ["2.4.2"],
+      "wcag_level": "A",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I Nr. 1c",
+      "title_de": "Fehlender oder leerer Seitentitel",
+      "description_de": "Jede Seite muss einen aussagekräftigen Titel im title-Element haben.",
+      "impact_de": "Nutzer können Seiten in Tabs oder im Verlauf nicht unterscheiden. Die Navigation wird erschwert.",
+      "fix_de": "Fügen Sie einen beschreibenden, einzigartigen Titel für jede Seite hinzu.",
+      "code_example": "<!-- Vorher -->\n<title></title>\n\n<!-- Nachher -->\n<title>Kontakt - AccessibilityChecker</title>"
+    },
+    "heading-order": {
+      "rule_id": "heading-order",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "bfsg_reference": "§3 Abs. 2 Nr. 1 BFSG, Anlage 1 Abschnitt I Nr. 1a",
+      "title_de": "Überschriftenhierarchie nicht eingehalten",
+      "description_de": "Überschriften sollten in einer logischen Reihenfolge verwendet werden (h1, dann h2, h3 usw.) ohne Ebenen zu überspringen.",
+      "impact_de": "Die Dokumentstruktur ist für Screenreader-Nutzer unklar. Die Navigation per Überschriften funktioniert nicht richtig.",
+      "fix_de": "Verwenden Sie Überschriften in der korrekten hierarchischen Reihenfolge.",
+      "code_example": "<!-- Vorher: h3 nach h1 (h2 fehlt) -->\n<h1>Startseite</h1>\n<h3>Unsere Produkte</h3>\n\n<!-- Nachher: Korrekte Hierarchie -->\n<h1>Startseite</h1>\n<h2>Unsere Produkte</h2>\n<h3>Kategorie A</h3>"
+    }
+  },
+  "_todo": "Add remaining 77+ axe-core rules with German translations and BFSG mapping"
+}
