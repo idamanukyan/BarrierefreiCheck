@@ -6,47 +6,74 @@
  */
 
 import { Worker } from 'bullmq';
-import { Redis } from 'ioredis';
 import dotenv from 'dotenv';
+import { logger } from './utils/logger.js';
+import { createScanWorker, shutdownWorker } from './workers/scanWorker.js';
+import { shutdownQueues, getQueueStatus } from './workers/queue.js';
+import { closeBrowserManager } from './utils/browser.js';
 
+// Load environment variables
 dotenv.config();
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '2', 10);
 
-console.log('🚀 AccessibilityChecker Scanner starting...');
-console.log(`📡 Connecting to Redis: ${REDIS_URL}`);
+logger.info('🚀 AccessibilityChecker Scanner starting...');
+logger.info(`📡 Redis URL: ${process.env.REDIS_URL || 'redis://localhost:6379'}`);
+logger.info(`⚙️  Concurrency: ${CONCURRENCY}`);
 
-// Redis connection
-const connection = new Redis(REDIS_URL, {
-  maxRetriesPerRequest: null,
-});
+// Create the scan worker
+let scanWorker: Worker | null = null;
 
-// TODO: Implement scan worker
-// const scanWorker = new Worker(
-//   'accessibility-scans',
-//   async (job) => {
-//     const { url, crawl, maxPages } = job.data;
-//     console.log(`Processing scan for: ${url}`);
-//
-//     // 1. Launch Puppeteer browser
-//     // 2. Navigate to URL
-//     // 3. Inject axe-core
-//     // 4. Run accessibility tests
-//     // 5. Capture screenshots
-//     // 6. Store results
-//
-//     return { status: 'completed', url };
-//   },
-//   { connection }
-// );
+async function start(): Promise<void> {
+  try {
+    // Start the scan worker
+    scanWorker = createScanWorker(CONCURRENCY);
 
-console.log('✅ Scanner worker initialized');
-console.log('⏳ Waiting for jobs...');
+    // Log initial queue status
+    const status = await getQueueStatus();
+    logger.info(`📊 Queue status - Waiting: ${status.waiting}, Active: ${status.active}`);
+
+    logger.info('✅ Scanner worker initialized');
+    logger.info('⏳ Waiting for jobs...');
+  } catch (error) {
+    logger.error('Failed to start scanner:', error);
+    process.exit(1);
+  }
+}
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('🛑 Shutting down scanner worker...');
-  // await scanWorker.close();
-  await connection.quit();
-  process.exit(0);
+async function shutdown(signal: string): Promise<void> {
+  logger.info(`🛑 Received ${signal}, shutting down...`);
+
+  try {
+    if (scanWorker) {
+      await shutdownWorker(scanWorker);
+    }
+
+    await closeBrowserManager();
+    await shutdownQueues();
+
+    logger.info('👋 Scanner shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Handle shutdown signals
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception:', error);
+  shutdown('uncaughtException');
 });
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+});
+
+// Start the worker
+start();
