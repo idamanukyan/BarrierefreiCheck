@@ -200,7 +200,7 @@ This project is proprietary software. All rights reserved.
 
 ## Contact
 
-For questions or support, please contact [your-email@example.com]
+For questions or support, please contact idamyan01@gmail.com
 
 ---
 
