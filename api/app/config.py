@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://localhost:3000"
 
+    # Frontend URL
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # Email/SMTP
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    FROM_EMAIL: str = "noreply@barrierefrei-check.de"
+    FROM_NAME: str = "BarrierefreiCheck"
+
     # Scan Settings
     max_concurrent_scans: int = 10
     scan_timeout_seconds: int = 300

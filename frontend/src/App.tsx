@@ -21,6 +21,7 @@ const ScanList = React.lazy(() => import('./pages/ScanList'));
 const ScanDetail = React.lazy(() => import('./pages/ScanDetail'));
 const Reports = React.lazy(() => import('./pages/Reports'));
 const Settings = React.lazy(() => import('./pages/Settings'));
+const Billing = React.lazy(() => import('./pages/Billing'));
 const Login = React.lazy(() => import('./pages/Login'));
 const Register = React.lazy(() => import('./pages/Register'));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));

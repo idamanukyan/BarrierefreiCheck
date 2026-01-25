@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.routers.scans import router as scans_router
+from app.routers.reports import router as reports_router
+from app.routers.billing import router as billing_router
 
 
 @asynccontextmanager
@@ -84,11 +86,5 @@ async def health_check():
 
 # Include routers
 app.include_router(scans_router, prefix="/api/v1/scans", tags=["Scans"])
-
-
-# TODO: Add additional routers
-# from app.routers import auth, reports, users, billing
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-# app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
-# app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-# app.include_router(billing.router, prefix="/api/v1/billing", tags=["Billing"])
+app.include_router(reports_router, prefix="/api/v1", tags=["Reports"])
+app.include_router(billing_router, prefix="/api/v1", tags=["Billing"])
