@@ -11,6 +11,8 @@ from app.database import init_db
 from app.routers.scans import router as scans_router
 from app.routers.reports import router as reports_router
 from app.routers.billing import router as billing_router
+from app.routers.auth import router as auth_router
+from app.routers.dashboard import router as dashboard_router
 
 
 @asynccontextmanager
@@ -85,6 +87,8 @@ async def health_check():
 
 
 # Include routers
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(dashboard_router, prefix="/api/v1", tags=["Dashboard"])
 app.include_router(scans_router, prefix="/api/v1/scans", tags=["Scans"])
 app.include_router(reports_router, prefix="/api/v1", tags=["Reports"])
 app.include_router(billing_router, prefix="/api/v1", tags=["Billing"])

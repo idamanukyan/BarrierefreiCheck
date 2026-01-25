@@ -50,6 +50,7 @@ class User(Base):
 
     # Relationships
     scans = relationship("Scan", back_populates="user", cascade="all, delete-orphan")
+    subscription = relationship("Subscription", back_populates="user", uselist=False)
 
     def __repr__(self):
         return f"<User {self.email}>"
