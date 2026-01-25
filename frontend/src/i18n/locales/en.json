@@ -1,0 +1,554 @@
+{
+  "common": {
+    "appName": "BarrierefreiCheck",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "confirm": "Confirm",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "export": "Export",
+    "import": "Import",
+    "download": "Download",
+    "upload": "Upload",
+    "refresh": "Refresh",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "none": "None",
+    "or": "or",
+    "and": "and",
+    "page": "Page",
+    "pages": "Pages",
+    "of": "of",
+    "showing": "Showing",
+    "results": "Results",
+    "noResults": "No results found",
+    "required": "Required",
+    "optional": "Optional"
+  },
+
+  "nav": {
+    "dashboard": "Dashboard",
+    "scans": "Scans",
+    "reports": "Reports",
+    "settings": "Settings",
+    "help": "Help",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "profile": "Profile",
+    "billing": "Billing",
+    "team": "Team"
+  },
+
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "subtitle": "Sign in to your account",
+      "email": "Email address",
+      "password": "Password",
+      "rememberMe": "Remember me",
+      "forgotPassword": "Forgot password?",
+      "submit": "Sign In",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up now",
+      "error": "Login failed. Please check your credentials."
+    },
+    "register": {
+      "title": "Create Account",
+      "subtitle": "Start with your free account today",
+      "name": "Full name",
+      "company": "Company",
+      "email": "Email address",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "terms": "I accept the Terms of Service and Privacy Policy",
+      "submit": "Create Account",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in now",
+      "passwordRequirements": "At least 8 characters, one uppercase letter, and one number"
+    },
+    "forgotPassword": {
+      "title": "Reset Password",
+      "subtitle": "Enter your email address to receive a reset link",
+      "email": "Email address",
+      "submit": "Send Link",
+      "backToLogin": "Back to login",
+      "success": "We have sent you an email with instructions to reset your password."
+    },
+    "resetPassword": {
+      "title": "Set New Password",
+      "password": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Change Password",
+      "success": "Your password has been changed successfully."
+    }
+  },
+
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back, {{name}}!",
+    "overview": "Overview",
+    "recentScans": "Recent Scans",
+    "quickActions": "Quick Actions",
+    "startScan": "Start New Scan",
+    "viewAllScans": "View All Scans",
+    "viewAllReports": "View All Reports",
+    "stats": {
+      "totalScans": "Total Scans",
+      "pagesScanned": "Pages Scanned",
+      "issuesFound": "Issues Found",
+      "averageScore": "Average Score",
+      "thisMonth": "This Month",
+      "lastMonth": "Last Month",
+      "trend": "{{value}}% vs last month"
+    },
+    "chart": {
+      "issuesByImpact": "Issues by Severity",
+      "issuesByWcag": "Issues by WCAG Level",
+      "scoreOverTime": "Score Over Time",
+      "scanActivity": "Scan Activity"
+    },
+    "empty": {
+      "title": "No scans yet",
+      "description": "Start your first accessibility scan to check your website.",
+      "action": "Start First Scan"
+    }
+  },
+
+  "scan": {
+    "new": {
+      "title": "Start New Scan",
+      "subtitle": "Check your website for accessibility issues",
+      "url": "Website URL",
+      "urlPlaceholder": "https://your-website.com",
+      "urlHelp": "The URL of the website you want to scan",
+      "options": "Scan Options",
+      "singlePage": "Single Page",
+      "singlePageDesc": "Scan only the entered URL",
+      "multiPage": "Multiple Pages",
+      "multiPageDesc": "Crawl website and scan multiple pages",
+      "maxPages": "Maximum Pages",
+      "maxPagesHelp": "Maximum number of pages to scan (1-{{max}})",
+      "advanced": "Advanced Options",
+      "respectRobots": "Respect robots.txt",
+      "respectRobotsHelp": "Follow restrictions in robots.txt file",
+      "captureScreenshots": "Capture Screenshots",
+      "captureScreenshotsHelp": "Take screenshots of found issues",
+      "submit": "Start Scan",
+      "submitting": "Starting...",
+      "planLimit": "Your plan allows up to {{max}} pages per scan",
+      "upgradePrompt": "Upgrade for more pages"
+    },
+    "status": {
+      "queued": "Queued",
+      "crawling": "Crawling website",
+      "scanning": "Checking accessibility",
+      "processing": "Processing results",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "progress": {
+      "title": "Scan in Progress",
+      "stage": "Stage: {{stage}}",
+      "pagesScanned": "{{scanned}} of {{total}} pages scanned",
+      "issuesFound": "{{count}} issues found",
+      "currentPage": "Current page: {{url}}",
+      "estimatedTime": "Estimated time remaining: {{time}}",
+      "cancel": "Cancel Scan"
+    },
+    "list": {
+      "title": "Your Scans",
+      "empty": "You haven't run any scans yet.",
+      "startFirst": "Start your first scan now!",
+      "columns": {
+        "url": "Website",
+        "status": "Status",
+        "pages": "Pages",
+        "issues": "Issues",
+        "score": "Score",
+        "date": "Date",
+        "actions": "Actions"
+      },
+      "filters": {
+        "all": "All",
+        "completed": "Completed",
+        "running": "Running",
+        "failed": "Failed"
+      },
+      "actions": {
+        "view": "View Details",
+        "report": "Generate Report",
+        "rescan": "Rescan",
+        "delete": "Delete"
+      }
+    },
+    "detail": {
+      "title": "Scan Details",
+      "summary": "Summary",
+      "pages": "Scanned Pages",
+      "issues": "Found Issues",
+      "timeline": "Scan Timeline",
+      "exportReport": "Export Report"
+    }
+  },
+
+  "results": {
+    "title": "Scan Results",
+    "summary": {
+      "title": "Summary",
+      "score": "Accessibility Score",
+      "scoreExcellent": "Excellent",
+      "scoreGood": "Good",
+      "scoreFair": "Fair",
+      "scorePoor": "Needs Improvement",
+      "totalIssues": "Total Issues",
+      "pagesScanned": "Pages Scanned",
+      "scanDuration": "Scan Duration",
+      "completedAt": "Completed at"
+    },
+    "issues": {
+      "title": "Issues",
+      "noIssues": "No accessibility issues found! 🎉",
+      "byImpact": "By Severity",
+      "byWcag": "By WCAG Level",
+      "byPage": "By Page",
+      "byRule": "By Rule",
+      "expand": "Show Details",
+      "collapse": "Hide Details",
+      "viewCode": "View Source Code",
+      "viewScreenshot": "View Screenshot",
+      "occurrences": "{{count}} occurrences",
+      "affectedPages": "{{count}} affected pages"
+    },
+    "issue": {
+      "impact": "Severity",
+      "wcagLevel": "WCAG Level",
+      "wcagCriteria": "WCAG Criterion",
+      "bfsgReference": "BFSG Reference",
+      "description": "Description",
+      "howToFix": "How to Fix",
+      "element": "Affected Element",
+      "selector": "CSS Selector",
+      "html": "HTML Code",
+      "learnMore": "Learn More",
+      "codeExample": "Code Example"
+    },
+    "impact": {
+      "critical": "Critical",
+      "serious": "Serious",
+      "moderate": "Moderate",
+      "minor": "Minor"
+    },
+    "impactDescription": {
+      "critical": "Completely blocks access for users with disabilities",
+      "serious": "Causes significant barriers for users with disabilities",
+      "moderate": "Makes usage difficult for people with disabilities",
+      "minor": "Minor impact on accessibility"
+    },
+    "wcagLevel": {
+      "A": "Level A (Minimum)",
+      "AA": "Level AA (Standard)",
+      "AAA": "Level AAA (Enhanced)"
+    },
+    "filters": {
+      "impact": "Severity",
+      "wcagLevel": "WCAG Level",
+      "page": "Page",
+      "rule": "Rule",
+      "status": "Status",
+      "clear": "Clear Filters"
+    },
+    "export": {
+      "title": "Export Report",
+      "format": "Format",
+      "language": "Language",
+      "includeScreenshots": "Include Screenshots",
+      "includeBranding": "Include Company Logo",
+      "download": "Download",
+      "generating": "Generating report...",
+      "formats": {
+        "pdf": "PDF Document",
+        "html": "HTML Report",
+        "json": "JSON Data",
+        "csv": "CSV Spreadsheet"
+      }
+    }
+  },
+
+  "reports": {
+    "title": "Reports",
+    "list": {
+      "empty": "No reports available",
+      "createFirst": "Generate a report from your scan results"
+    },
+    "create": {
+      "title": "Create New Report",
+      "selectScan": "Select Scan",
+      "format": "Report Format",
+      "options": "Options",
+      "generate": "Generate Report"
+    },
+    "templates": {
+      "executive": "Executive Summary",
+      "technical": "Technical Report",
+      "compliance": "Compliance Report",
+      "developer": "Developer Report"
+    }
+  },
+
+  "bfsg": {
+    "title": "BFSG Compliance",
+    "subtitle": "German Accessibility Strengthening Act",
+    "deadline": "Deadline: June 28, 2025",
+    "status": {
+      "compliant": "BFSG Compliant",
+      "partiallyCompliant": "Partially Compliant",
+      "nonCompliant": "Not Compliant"
+    },
+    "requirements": {
+      "title": "Requirements",
+      "perceivable": "Perceivable",
+      "operable": "Operable",
+      "understandable": "Understandable",
+      "robust": "Robust"
+    },
+    "info": {
+      "what": "What is BFSG?",
+      "whatDesc": "The Barrierefreiheitsstärkungsgesetz (BFSG) implements the EU directive on accessibility requirements for products and services in Germany.",
+      "who": "Who is affected?",
+      "whoDesc": "Companies offering digital products and services to consumers must meet accessibility requirements.",
+      "when": "When does it apply?",
+      "whenDesc": "The BFSG comes into effect on June 28, 2025. All affected products and services must be accessible by then.",
+      "penalties": "Consequences of Non-Compliance",
+      "penaltiesDesc": "Violations can result in fines of up to €100,000."
+    }
+  },
+
+  "wcag": {
+    "title": "WCAG 2.1",
+    "subtitle": "Web Content Accessibility Guidelines",
+    "levels": {
+      "A": "Level A",
+      "AA": "Level AA",
+      "AAA": "Level AAA"
+    },
+    "principles": {
+      "perceivable": {
+        "title": "Perceivable",
+        "description": "Information and user interface components must be presentable in ways users can perceive."
+      },
+      "operable": {
+        "title": "Operable",
+        "description": "User interface components and navigation must be operable."
+      },
+      "understandable": {
+        "title": "Understandable",
+        "description": "Information and operation of user interface must be understandable."
+      },
+      "robust": {
+        "title": "Robust",
+        "description": "Content must be robust enough to be interpreted reliably by a wide variety of user agents."
+      }
+    }
+  },
+
+  "settings": {
+    "title": "Settings",
+    "profile": {
+      "title": "Profile",
+      "name": "Name",
+      "email": "Email",
+      "company": "Company",
+      "phone": "Phone",
+      "save": "Save Profile",
+      "changePassword": "Change Password",
+      "deleteAccount": "Delete Account"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "email": "Email Notifications",
+      "scanComplete": "Scan Completed",
+      "weeklyReport": "Weekly Report",
+      "monthlyReport": "Monthly Report",
+      "newsletter": "Newsletter"
+    },
+    "branding": {
+      "title": "Branding",
+      "logo": "Company Logo",
+      "uploadLogo": "Upload Logo",
+      "removeLogo": "Remove Logo",
+      "companyName": "Company Name in Reports",
+      "primaryColor": "Primary Color"
+    },
+    "api": {
+      "title": "API Access",
+      "key": "API Key",
+      "generate": "Generate New Key",
+      "revoke": "Revoke Key",
+      "documentation": "API Documentation",
+      "warning": "Keep your API key secure. It will only be shown once."
+    },
+    "language": {
+      "title": "Language",
+      "select": "Select Language",
+      "german": "Deutsch",
+      "english": "English"
+    },
+    "theme": {
+      "title": "Appearance",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    }
+  },
+
+  "billing": {
+    "title": "Billing",
+    "currentPlan": "Current Plan",
+    "usage": "Usage",
+    "invoices": "Invoices",
+    "paymentMethod": "Payment Method",
+    "plans": {
+      "free": {
+        "name": "Free",
+        "description": "For getting started",
+        "features": [
+          "5 scans per month",
+          "Single page scans",
+          "Basic reports"
+        ]
+      },
+      "starter": {
+        "name": "Starter",
+        "description": "For small businesses",
+        "price": "49",
+        "period": "per month",
+        "features": [
+          "50 scans per month",
+          "Up to 25 pages per scan",
+          "PDF reports",
+          "Email support"
+        ]
+      },
+      "professional": {
+        "name": "Professional",
+        "description": "For growing businesses",
+        "price": "149",
+        "period": "per month",
+        "features": [
+          "Unlimited scans",
+          "Up to 100 pages per scan",
+          "White-label reports",
+          "API access",
+          "Priority support"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "description": "For large organizations",
+        "price": "Custom",
+        "features": [
+          "Unlimited scans and pages",
+          "Dedicated infrastructure",
+          "SLA guarantee",
+          "Account manager",
+          "Custom integrations"
+        ]
+      }
+    },
+    "upgrade": "Upgrade",
+    "downgrade": "Downgrade",
+    "cancel": "Cancel Plan",
+    "cancelConfirm": "Are you sure you want to cancel your plan?"
+  },
+
+  "errors": {
+    "generic": "An error occurred. Please try again.",
+    "network": "Network error. Please check your internet connection.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "notFound": "The requested resource was not found.",
+    "serverError": "A server error occurred. Please try again later.",
+    "validation": {
+      "required": "This field is required.",
+      "email": "Please enter a valid email address.",
+      "url": "Please enter a valid URL.",
+      "minLength": "At least {{min}} characters required.",
+      "maxLength": "Maximum {{max}} characters allowed.",
+      "passwordMismatch": "Passwords do not match."
+    },
+    "scan": {
+      "invalidUrl": "The entered URL is invalid.",
+      "urlNotReachable": "The website is not reachable.",
+      "scanFailed": "The scan failed.",
+      "timeout": "The scan took too long and was cancelled."
+    }
+  },
+
+  "help": {
+    "title": "Help & Support",
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "items": [
+        {
+          "question": "What does BarrierefreiCheck test?",
+          "answer": "BarrierefreiCheck automatically tests your website for accessibility issues according to WCAG 2.1 and BFSG requirements."
+        },
+        {
+          "question": "How long does a scan take?",
+          "answer": "A single-page scan takes about 10-30 seconds. For multiple pages, the duration depends on the number of pages."
+        },
+        {
+          "question": "What does the score mean?",
+          "answer": "The score indicates the level of accessibility of your website. 100% means no automatically detectable issues were found."
+        },
+        {
+          "question": "Are all issues detected?",
+          "answer": "Automated tests can detect about 30-40% of accessibility issues. For a complete assessment, we recommend supplementary manual testing."
+        }
+      ]
+    },
+    "contact": {
+      "title": "Contact",
+      "email": "support@barrierefrei-check.de",
+      "phone": "+49 (0) 30 12345678",
+      "hours": "Mon-Fri 9:00-17:00 CET"
+    },
+    "documentation": "Documentation",
+    "tutorials": "Tutorials",
+    "changelog": "Changelog"
+  },
+
+  "footer": {
+    "copyright": "© {{year}} BarrierefreiCheck. All rights reserved.",
+    "imprint": "Imprint",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "contact": "Contact"
+  },
+
+  "time": {
+    "seconds": "{{count}} second",
+    "seconds_plural": "{{count}} seconds",
+    "minutes": "{{count}} minute",
+    "minutes_plural": "{{count}} minutes",
+    "hours": "{{count}} hour",
+    "hours_plural": "{{count}} hours",
+    "days": "{{count}} day",
+    "days_plural": "{{count}} days",
+    "ago": "{{time}} ago",
+    "justNow": "Just now"
+  }
+}

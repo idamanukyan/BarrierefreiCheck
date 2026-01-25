@@ -18,7 +18,10 @@
     "zustand": "^4.4.7",
     "recharts": "^2.10.3",
     "axios": "^1.6.5",
-    "clsx": "^2.1.0"
+    "clsx": "^2.1.0",
+    "i18next": "^23.8.0",
+    "react-i18next": "^14.0.0",
+    "i18next-browser-languagedetector": "^7.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.47",

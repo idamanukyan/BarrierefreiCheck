@@ -1,0 +1,554 @@
+{
+  "common": {
+    "appName": "BarrierefreiCheck",
+    "loading": "Wird geladen...",
+    "error": "Fehler",
+    "success": "Erfolgreich",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "create": "Erstellen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "previous": "Zurück",
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "search": "Suchen",
+    "filter": "Filtern",
+    "sort": "Sortieren",
+    "export": "Exportieren",
+    "import": "Importieren",
+    "download": "Herunterladen",
+    "upload": "Hochladen",
+    "refresh": "Aktualisieren",
+    "yes": "Ja",
+    "no": "Nein",
+    "all": "Alle",
+    "none": "Keine",
+    "or": "oder",
+    "and": "und",
+    "page": "Seite",
+    "pages": "Seiten",
+    "of": "von",
+    "showing": "Zeige",
+    "results": "Ergebnisse",
+    "noResults": "Keine Ergebnisse gefunden",
+    "required": "Pflichtfeld",
+    "optional": "Optional"
+  },
+
+  "nav": {
+    "dashboard": "Dashboard",
+    "scans": "Scans",
+    "reports": "Berichte",
+    "settings": "Einstellungen",
+    "help": "Hilfe",
+    "logout": "Abmelden",
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "profile": "Profil",
+    "billing": "Abrechnung",
+    "team": "Team"
+  },
+
+  "auth": {
+    "login": {
+      "title": "Anmelden",
+      "subtitle": "Melden Sie sich bei Ihrem Konto an",
+      "email": "E-Mail-Adresse",
+      "password": "Passwort",
+      "rememberMe": "Angemeldet bleiben",
+      "forgotPassword": "Passwort vergessen?",
+      "submit": "Anmelden",
+      "noAccount": "Noch kein Konto?",
+      "signUp": "Jetzt registrieren",
+      "error": "Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Anmeldedaten."
+    },
+    "register": {
+      "title": "Konto erstellen",
+      "subtitle": "Starten Sie jetzt mit Ihrem kostenlosen Konto",
+      "name": "Vollständiger Name",
+      "company": "Unternehmen",
+      "email": "E-Mail-Adresse",
+      "password": "Passwort",
+      "confirmPassword": "Passwort bestätigen",
+      "terms": "Ich akzeptiere die AGB und Datenschutzerklärung",
+      "submit": "Konto erstellen",
+      "hasAccount": "Bereits ein Konto?",
+      "signIn": "Jetzt anmelden",
+      "passwordRequirements": "Mindestens 8 Zeichen, ein Großbuchstabe und eine Zahl"
+    },
+    "forgotPassword": {
+      "title": "Passwort zurücksetzen",
+      "subtitle": "Geben Sie Ihre E-Mail-Adresse ein, um einen Link zum Zurücksetzen zu erhalten",
+      "email": "E-Mail-Adresse",
+      "submit": "Link senden",
+      "backToLogin": "Zurück zur Anmeldung",
+      "success": "Wir haben Ihnen eine E-Mail mit Anweisungen zum Zurücksetzen Ihres Passworts gesendet."
+    },
+    "resetPassword": {
+      "title": "Neues Passwort festlegen",
+      "password": "Neues Passwort",
+      "confirmPassword": "Passwort bestätigen",
+      "submit": "Passwort ändern",
+      "success": "Ihr Passwort wurde erfolgreich geändert."
+    }
+  },
+
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Willkommen zurück, {{name}}!",
+    "overview": "Übersicht",
+    "recentScans": "Letzte Scans",
+    "quickActions": "Schnellaktionen",
+    "startScan": "Neuen Scan starten",
+    "viewAllScans": "Alle Scans anzeigen",
+    "viewAllReports": "Alle Berichte anzeigen",
+    "stats": {
+      "totalScans": "Gesamte Scans",
+      "pagesScanned": "Gescannte Seiten",
+      "issuesFound": "Gefundene Probleme",
+      "averageScore": "Durchschnittliche Punktzahl",
+      "thisMonth": "Dieser Monat",
+      "lastMonth": "Letzter Monat",
+      "trend": "{{value}}% gegenüber Vormonat"
+    },
+    "chart": {
+      "issuesByImpact": "Probleme nach Schweregrad",
+      "issuesByWcag": "Probleme nach WCAG-Stufe",
+      "scoreOverTime": "Punktzahl im Zeitverlauf",
+      "scanActivity": "Scan-Aktivität"
+    },
+    "empty": {
+      "title": "Noch keine Scans",
+      "description": "Starten Sie Ihren ersten Barrierefreiheits-Scan, um Ihre Website zu prüfen.",
+      "action": "Ersten Scan starten"
+    }
+  },
+
+  "scan": {
+    "new": {
+      "title": "Neuen Scan starten",
+      "subtitle": "Prüfen Sie Ihre Website auf Barrierefreiheit",
+      "url": "Website-URL",
+      "urlPlaceholder": "https://ihre-website.de",
+      "urlHelp": "Die URL der Website, die Sie scannen möchten",
+      "options": "Scan-Optionen",
+      "singlePage": "Einzelne Seite",
+      "singlePageDesc": "Nur die eingegebene URL scannen",
+      "multiPage": "Mehrere Seiten",
+      "multiPageDesc": "Website crawlen und mehrere Seiten scannen",
+      "maxPages": "Maximale Seitenanzahl",
+      "maxPagesHelp": "Maximale Anzahl der zu scannenden Seiten (1-{{max}})",
+      "advanced": "Erweiterte Optionen",
+      "respectRobots": "robots.txt beachten",
+      "respectRobotsHelp": "Einschränkungen der robots.txt-Datei respektieren",
+      "captureScreenshots": "Screenshots erstellen",
+      "captureScreenshotsHelp": "Screenshots der gefundenen Probleme erfassen",
+      "submit": "Scan starten",
+      "submitting": "Wird gestartet...",
+      "planLimit": "Ihr Plan erlaubt maximal {{max}} Seiten pro Scan",
+      "upgradePrompt": "Upgrade für mehr Seiten"
+    },
+    "status": {
+      "queued": "In Warteschlange",
+      "crawling": "Website wird durchsucht",
+      "scanning": "Barrierefreiheit wird geprüft",
+      "processing": "Ergebnisse werden verarbeitet",
+      "completed": "Abgeschlossen",
+      "failed": "Fehlgeschlagen",
+      "cancelled": "Abgebrochen"
+    },
+    "progress": {
+      "title": "Scan läuft",
+      "stage": "Phase: {{stage}}",
+      "pagesScanned": "{{scanned}} von {{total}} Seiten gescannt",
+      "issuesFound": "{{count}} Probleme gefunden",
+      "currentPage": "Aktuelle Seite: {{url}}",
+      "estimatedTime": "Geschätzte Restzeit: {{time}}",
+      "cancel": "Scan abbrechen"
+    },
+    "list": {
+      "title": "Ihre Scans",
+      "empty": "Sie haben noch keine Scans durchgeführt.",
+      "startFirst": "Starten Sie jetzt Ihren ersten Scan!",
+      "columns": {
+        "url": "Website",
+        "status": "Status",
+        "pages": "Seiten",
+        "issues": "Probleme",
+        "score": "Punktzahl",
+        "date": "Datum",
+        "actions": "Aktionen"
+      },
+      "filters": {
+        "all": "Alle",
+        "completed": "Abgeschlossen",
+        "running": "Laufend",
+        "failed": "Fehlgeschlagen"
+      },
+      "actions": {
+        "view": "Details anzeigen",
+        "report": "Bericht erstellen",
+        "rescan": "Erneut scannen",
+        "delete": "Löschen"
+      }
+    },
+    "detail": {
+      "title": "Scan-Details",
+      "summary": "Zusammenfassung",
+      "pages": "Gescannte Seiten",
+      "issues": "Gefundene Probleme",
+      "timeline": "Scan-Verlauf",
+      "exportReport": "Bericht exportieren"
+    }
+  },
+
+  "results": {
+    "title": "Scan-Ergebnisse",
+    "summary": {
+      "title": "Zusammenfassung",
+      "score": "Barrierefreiheits-Punktzahl",
+      "scoreExcellent": "Ausgezeichnet",
+      "scoreGood": "Gut",
+      "scoreFair": "Befriedigend",
+      "scorePoor": "Verbesserungsbedürftig",
+      "totalIssues": "Gesamte Probleme",
+      "pagesScanned": "Gescannte Seiten",
+      "scanDuration": "Scan-Dauer",
+      "completedAt": "Abgeschlossen am"
+    },
+    "issues": {
+      "title": "Probleme",
+      "noIssues": "Keine Barrierefreiheitsprobleme gefunden! 🎉",
+      "byImpact": "Nach Schweregrad",
+      "byWcag": "Nach WCAG-Stufe",
+      "byPage": "Nach Seite",
+      "byRule": "Nach Regel",
+      "expand": "Details anzeigen",
+      "collapse": "Details ausblenden",
+      "viewCode": "Quellcode anzeigen",
+      "viewScreenshot": "Screenshot anzeigen",
+      "occurrences": "{{count}} Vorkommen",
+      "affectedPages": "{{count}} betroffene Seiten"
+    },
+    "issue": {
+      "impact": "Schweregrad",
+      "wcagLevel": "WCAG-Stufe",
+      "wcagCriteria": "WCAG-Kriterium",
+      "bfsgReference": "BFSG-Referenz",
+      "description": "Beschreibung",
+      "howToFix": "Lösungsvorschlag",
+      "element": "Betroffenes Element",
+      "selector": "CSS-Selektor",
+      "html": "HTML-Code",
+      "learnMore": "Mehr erfahren",
+      "codeExample": "Code-Beispiel"
+    },
+    "impact": {
+      "critical": "Kritisch",
+      "serious": "Schwerwiegend",
+      "moderate": "Mittel",
+      "minor": "Gering"
+    },
+    "impactDescription": {
+      "critical": "Blockiert den Zugang für Nutzer mit Behinderungen vollständig",
+      "serious": "Verursacht erhebliche Barrieren für Nutzer mit Behinderungen",
+      "moderate": "Erschwert die Nutzung für Menschen mit Behinderungen",
+      "minor": "Geringfügige Beeinträchtigung der Barrierefreiheit"
+    },
+    "wcagLevel": {
+      "A": "Stufe A (Mindestanforderung)",
+      "AA": "Stufe AA (Standard)",
+      "AAA": "Stufe AAA (Erweitert)"
+    },
+    "filters": {
+      "impact": "Schweregrad",
+      "wcagLevel": "WCAG-Stufe",
+      "page": "Seite",
+      "rule": "Regel",
+      "status": "Status",
+      "clear": "Filter zurücksetzen"
+    },
+    "export": {
+      "title": "Bericht exportieren",
+      "format": "Format",
+      "language": "Sprache",
+      "includeScreenshots": "Screenshots einschließen",
+      "includeBranding": "Firmenlogo einschließen",
+      "download": "Herunterladen",
+      "generating": "Bericht wird erstellt...",
+      "formats": {
+        "pdf": "PDF-Dokument",
+        "html": "HTML-Bericht",
+        "json": "JSON-Daten",
+        "csv": "CSV-Tabelle"
+      }
+    }
+  },
+
+  "reports": {
+    "title": "Berichte",
+    "list": {
+      "empty": "Keine Berichte vorhanden",
+      "createFirst": "Erstellen Sie einen Bericht aus Ihren Scan-Ergebnissen"
+    },
+    "create": {
+      "title": "Neuen Bericht erstellen",
+      "selectScan": "Scan auswählen",
+      "format": "Berichtsformat",
+      "options": "Optionen",
+      "generate": "Bericht erstellen"
+    },
+    "templates": {
+      "executive": "Zusammenfassung für Führungskräfte",
+      "technical": "Technischer Bericht",
+      "compliance": "Compliance-Bericht",
+      "developer": "Entwickler-Bericht"
+    }
+  },
+
+  "bfsg": {
+    "title": "BFSG-Compliance",
+    "subtitle": "Barrierefreiheitsstärkungsgesetz",
+    "deadline": "Stichtag: 28. Juni 2025",
+    "status": {
+      "compliant": "BFSG-konform",
+      "partiallyCompliant": "Teilweise konform",
+      "nonCompliant": "Nicht konform"
+    },
+    "requirements": {
+      "title": "Anforderungen",
+      "perceivable": "Wahrnehmbar",
+      "operable": "Bedienbar",
+      "understandable": "Verständlich",
+      "robust": "Robust"
+    },
+    "info": {
+      "what": "Was ist das BFSG?",
+      "whatDesc": "Das Barrierefreiheitsstärkungsgesetz (BFSG) setzt die EU-Richtlinie über die Barrierefreiheitsanforderungen für Produkte und Dienstleistungen um.",
+      "who": "Wer ist betroffen?",
+      "whoDesc": "Unternehmen, die digitale Produkte und Dienstleistungen für Verbraucher anbieten, müssen die Barrierefreiheitsanforderungen erfüllen.",
+      "when": "Ab wann gilt es?",
+      "whenDesc": "Das BFSG tritt am 28. Juni 2025 in Kraft. Bis dahin müssen alle betroffenen Produkte und Dienstleistungen barrierefrei sein.",
+      "penalties": "Konsequenzen bei Nichteinhaltung",
+      "penaltiesDesc": "Verstöße können mit Bußgeldern bis zu 100.000 Euro geahndet werden."
+    }
+  },
+
+  "wcag": {
+    "title": "WCAG 2.1",
+    "subtitle": "Web Content Accessibility Guidelines",
+    "levels": {
+      "A": "Stufe A",
+      "AA": "Stufe AA",
+      "AAA": "Stufe AAA"
+    },
+    "principles": {
+      "perceivable": {
+        "title": "Wahrnehmbar",
+        "description": "Informationen und Benutzeroberfläche müssen so dargestellt werden, dass sie von allen wahrgenommen werden können."
+      },
+      "operable": {
+        "title": "Bedienbar",
+        "description": "Benutzeroberfläche und Navigation müssen bedienbar sein."
+      },
+      "understandable": {
+        "title": "Verständlich",
+        "description": "Informationen und Bedienung müssen verständlich sein."
+      },
+      "robust": {
+        "title": "Robust",
+        "description": "Inhalte müssen robust genug sein, um von verschiedenen Benutzeragenten interpretiert zu werden."
+      }
+    }
+  },
+
+  "settings": {
+    "title": "Einstellungen",
+    "profile": {
+      "title": "Profil",
+      "name": "Name",
+      "email": "E-Mail",
+      "company": "Unternehmen",
+      "phone": "Telefon",
+      "save": "Profil speichern",
+      "changePassword": "Passwort ändern",
+      "deleteAccount": "Konto löschen"
+    },
+    "notifications": {
+      "title": "Benachrichtigungen",
+      "email": "E-Mail-Benachrichtigungen",
+      "scanComplete": "Scan abgeschlossen",
+      "weeklyReport": "Wöchentlicher Bericht",
+      "monthlyReport": "Monatlicher Bericht",
+      "newsletter": "Newsletter"
+    },
+    "branding": {
+      "title": "Branding",
+      "logo": "Firmenlogo",
+      "uploadLogo": "Logo hochladen",
+      "removeLogo": "Logo entfernen",
+      "companyName": "Firmenname in Berichten",
+      "primaryColor": "Primärfarbe"
+    },
+    "api": {
+      "title": "API-Zugang",
+      "key": "API-Schlüssel",
+      "generate": "Neuen Schlüssel generieren",
+      "revoke": "Schlüssel widerrufen",
+      "documentation": "API-Dokumentation",
+      "warning": "Bewahren Sie Ihren API-Schlüssel sicher auf. Er wird nur einmal angezeigt."
+    },
+    "language": {
+      "title": "Sprache",
+      "select": "Sprache auswählen",
+      "german": "Deutsch",
+      "english": "English"
+    },
+    "theme": {
+      "title": "Erscheinungsbild",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "Systemeinstellung"
+    }
+  },
+
+  "billing": {
+    "title": "Abrechnung",
+    "currentPlan": "Aktueller Plan",
+    "usage": "Nutzung",
+    "invoices": "Rechnungen",
+    "paymentMethod": "Zahlungsmethode",
+    "plans": {
+      "free": {
+        "name": "Kostenlos",
+        "description": "Für den Einstieg",
+        "features": [
+          "5 Scans pro Monat",
+          "Einzelseitige Scans",
+          "Basis-Berichte"
+        ]
+      },
+      "starter": {
+        "name": "Starter",
+        "description": "Für kleine Unternehmen",
+        "price": "49",
+        "period": "pro Monat",
+        "features": [
+          "50 Scans pro Monat",
+          "Bis zu 25 Seiten pro Scan",
+          "PDF-Berichte",
+          "E-Mail-Support"
+        ]
+      },
+      "professional": {
+        "name": "Professional",
+        "description": "Für wachsende Unternehmen",
+        "price": "149",
+        "period": "pro Monat",
+        "features": [
+          "Unbegrenzte Scans",
+          "Bis zu 100 Seiten pro Scan",
+          "White-Label-Berichte",
+          "API-Zugang",
+          "Prioritäts-Support"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "description": "Für große Organisationen",
+        "price": "Individuell",
+        "features": [
+          "Unbegrenzte Scans und Seiten",
+          "Dedizierte Infrastruktur",
+          "SLA-Garantie",
+          "Account Manager",
+          "Individuelle Integrationen"
+        ]
+      }
+    },
+    "upgrade": "Upgrade",
+    "downgrade": "Downgrade",
+    "cancel": "Plan kündigen",
+    "cancelConfirm": "Sind Sie sicher, dass Sie Ihren Plan kündigen möchten?"
+  },
+
+  "errors": {
+    "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+    "network": "Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.",
+    "unauthorized": "Sie sind nicht berechtigt, diese Aktion auszuführen.",
+    "notFound": "Die angeforderte Ressource wurde nicht gefunden.",
+    "serverError": "Ein Serverfehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+    "validation": {
+      "required": "Dieses Feld ist erforderlich.",
+      "email": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+      "url": "Bitte geben Sie eine gültige URL ein.",
+      "minLength": "Mindestens {{min}} Zeichen erforderlich.",
+      "maxLength": "Maximal {{max}} Zeichen erlaubt.",
+      "passwordMismatch": "Die Passwörter stimmen nicht überein."
+    },
+    "scan": {
+      "invalidUrl": "Die eingegebene URL ist ungültig.",
+      "urlNotReachable": "Die Website ist nicht erreichbar.",
+      "scanFailed": "Der Scan ist fehlgeschlagen.",
+      "timeout": "Der Scan hat zu lange gedauert und wurde abgebrochen."
+    }
+  },
+
+  "help": {
+    "title": "Hilfe & Support",
+    "faq": {
+      "title": "Häufig gestellte Fragen",
+      "items": [
+        {
+          "question": "Was prüft BarrierefreiCheck?",
+          "answer": "BarrierefreiCheck prüft Ihre Website automatisch auf Barrierefreiheitsprobleme nach WCAG 2.1 und den Anforderungen des BFSG."
+        },
+        {
+          "question": "Wie lange dauert ein Scan?",
+          "answer": "Ein Einzelseiten-Scan dauert etwa 10-30 Sekunden. Bei mehreren Seiten hängt die Dauer von der Anzahl der Seiten ab."
+        },
+        {
+          "question": "Was bedeutet die Punktzahl?",
+          "answer": "Die Punktzahl zeigt den Grad der Barrierefreiheit Ihrer Website an. 100% bedeutet, dass keine automatisch erkennbaren Probleme gefunden wurden."
+        },
+        {
+          "question": "Werden alle Probleme erkannt?",
+          "answer": "Automatisierte Tests können etwa 30-40% der Barrierefreiheitsprobleme erkennen. Für eine vollständige Prüfung empfehlen wir ergänzende manuelle Tests."
+        }
+      ]
+    },
+    "contact": {
+      "title": "Kontakt",
+      "email": "support@barrierefrei-check.de",
+      "phone": "+49 (0) 30 12345678",
+      "hours": "Mo-Fr 9:00-17:00 Uhr"
+    },
+    "documentation": "Dokumentation",
+    "tutorials": "Tutorials",
+    "changelog": "Änderungsprotokoll"
+  },
+
+  "footer": {
+    "copyright": "© {{year}} BarrierefreiCheck. Alle Rechte vorbehalten.",
+    "imprint": "Impressum",
+    "privacy": "Datenschutz",
+    "terms": "AGB",
+    "contact": "Kontakt"
+  },
+
+  "time": {
+    "seconds": "{{count}} Sekunde",
+    "seconds_plural": "{{count}} Sekunden",
+    "minutes": "{{count}} Minute",
+    "minutes_plural": "{{count}} Minuten",
+    "hours": "{{count}} Stunde",
+    "hours_plural": "{{count}} Stunden",
+    "days": "{{count}} Tag",
+    "days_plural": "{{count}} Tage",
+    "ago": "vor {{time}}",
+    "justNow": "Gerade eben"
+  }
+}
