@@ -16,6 +16,8 @@ import redis
 from app.database import get_db
 from app.config import settings
 from app.models.scan import Scan, Page, Issue, ScanStatus, ImpactLevel, WcagLevel
+from app.models import User
+from app.routers.auth import get_current_user
 from app.schemas.scan import (
     ScanCreate,
     ScanResponse,
@@ -70,6 +72,7 @@ async def create_scan(
     scan_data: ScanCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Start a new accessibility scan.
@@ -78,10 +81,7 @@ async def create_scan(
     - **crawl**: Whether to crawl and scan multiple pages
     - **max_pages**: Maximum number of pages to scan (if crawl=True)
     """
-    # TODO: Get user from auth token
-    # For now, use a placeholder user ID
-    from uuid import uuid4
-    user_id = uuid4()  # Placeholder - replace with authenticated user
+    user_id = current_user.id
 
     # Create scan record
     scan = Scan(
