@@ -15,6 +15,7 @@ import MainLayout from './components/layouts/MainLayout';
 import AuthLayout from './components/layouts/AuthLayout';
 
 // Pages - Lazy loaded
+const Landing = React.lazy(() => import('./pages/Landing'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const ScanNew = React.lazy(() => import('./pages/ScanNew'));
 const ScanList = React.lazy(() => import('./pages/ScanList'));
@@ -84,7 +85,10 @@ const App: React.FC = () => {
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* Public routes */}
+            {/* Public landing page */}
+            <Route path="/" element={<Landing />} />
+
+            {/* Auth routes */}
             <Route
               path="/login"
               element={
@@ -118,24 +122,50 @@ const App: React.FC = () => {
 
             {/* Protected routes */}
             <Route
-              path="/"
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <MainLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="scans" element={<ScanList />} />
-              <Route path="scans/new" element={<ScanNew />} />
-              <Route path="scans/:scanId" element={<ScanDetail />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="settings" element={<Settings />} />
+              <Route index element={<Dashboard />} />
+            </Route>
+            <Route
+              path="/scans"
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<ScanList />} />
+              <Route path="new" element={<ScanNew />} />
+              <Route path=":scanId" element={<ScanDetail />} />
+            </Route>
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Reports />} />
+            </Route>
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Settings />} />
             </Route>
 
             {/* 404 redirect */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </BrowserRouter>

@@ -153,9 +153,12 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         user: state.user,
       }),
+      onRehydrateStorage: () => (state) => {
+        // After hydration, check if token is still valid
+        if (state) {
+          state.checkAuth();
+        }
+      },
     }
   )
 );
-
-// Initialize auth check on app load
-useAuthStore.getState().checkAuth();

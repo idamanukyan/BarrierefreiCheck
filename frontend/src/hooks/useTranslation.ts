@@ -26,8 +26,10 @@ export function useTranslation(namespace?: string) {
     await changeLanguage(lang);
   }, []);
 
-  const formatRelativeTime = useCallback((date: Date | string): string => {
+  const formatRelativeTime = useCallback((date: Date | string | undefined | null): string => {
+    if (!date) return '-';
     const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return '-';
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffSeconds = Math.floor(diffMs / 1000);

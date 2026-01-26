@@ -66,8 +66,10 @@ export async function changeLanguage(lang: SupportedLanguage): Promise<void> {
 /**
  * Format date according to current locale
  */
-export function formatDate(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date: Date | string | undefined | null, options?: Intl.DateTimeFormatOptions): string {
+  if (!date) return '-';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '-';
   const locale = getCurrentLanguage() === 'de' ? 'de-DE' : 'en-US';
   return d.toLocaleDateString(locale, options);
 }
