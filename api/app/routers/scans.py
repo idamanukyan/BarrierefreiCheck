@@ -5,15 +5,18 @@ API endpoints for accessibility scan management.
 """
 
 import math
+import logging
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import desc, func
 import redis
 
 from app.database import get_db
+
+logger = logging.getLogger(__name__)
 from app.config import settings
 from app.models.scan import Scan, Page, Issue, ScanStatus, ImpactLevel, WcagLevel
 from app.models import User
@@ -28,6 +31,7 @@ from app.schemas.scan import (
     IssueListResponse,
     ElementInfo,
     PageResponse,
+    PageListResponse,
 )
 
 router = APIRouter()
@@ -67,6 +71,19 @@ def scan_to_response(scan: Scan) -> ScanResponse:
     )
 
 
+def get_current_month_scan_count(db: Session, user_id: UUID) -> int:
+    """Get the number of scans the user has created in the current month."""
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    count = db.query(func.count(Scan.id)).filter(
+        Scan.user_id == user_id,
+        Scan.created_at >= month_start,
+    ).scalar()
+
+    return count or 0
+
+
 @router.post("", response_model=ScanResponse, status_code=201)
 async def create_scan(
     scan_data: ScanCreate,
@@ -82,15 +99,40 @@ async def create_scan(
     - **max_pages**: Maximum number of pages to scan (if crawl=True)
     """
     user_id = current_user.id
+    plan_limits = current_user.plan_limits
+
+    # Check monthly scan limit
+    scans_per_month = plan_limits.get("scans_per_month", 3)
+    if scans_per_month != -1:  # -1 means unlimited
+        current_month_scans = get_current_month_scan_count(db, user_id)
+        if current_month_scans >= scans_per_month:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Monthly scan limit reached ({scans_per_month} scans). "
+                       f"Please upgrade your plan for more scans."
+            )
+
+    # Check pages per scan limit
+    pages_per_scan_limit = plan_limits.get("pages_per_scan", 5)
+    requested_pages = scan_data.max_pages if scan_data.crawl else 1
+    if requested_pages > pages_per_scan_limit:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your plan allows up to {pages_per_scan_limit} pages per scan. "
+                   f"Please upgrade your plan or reduce the number of pages."
+        )
+
+    # Enforce the limit on max_pages
+    effective_max_pages = min(scan_data.max_pages, pages_per_scan_limit)
 
     # Create scan record
     scan = Scan(
         user_id=user_id,
         url=scan_data.url,
         crawl=scan_data.crawl,
-        max_pages=scan_data.max_pages,
+        max_pages=effective_max_pages,
         status=ScanStatus.QUEUED,
-        progress_total=scan_data.max_pages if scan_data.crawl else 1,
+        progress_total=effective_max_pages if scan_data.crawl else 1,
     )
     db.add(scan)
     db.commit()
@@ -103,7 +145,7 @@ async def create_scan(
             "scanId": str(scan.id),
             "url": scan_data.url,
             "crawl": scan_data.crawl,
-            "maxPages": scan_data.max_pages,
+            "maxPages": effective_max_pages,
             "userId": str(user_id),
             "options": {
                 "captureScreenshots": True,
@@ -124,10 +166,21 @@ async def create_scan(
             },
         }
         r.rpush("bull:accessibility-scans:wait", json.dumps(job))
+        logger.info(f"Scan job {job_id} queued successfully for URL: {scan_data.url}")
 
     except Exception as e:
-        # Log error but don't fail - scan record is created
-        print(f"Error adding job to queue: {e}")
+        # Mark scan as failed since job couldn't be queued
+        logger.error(f"Failed to queue scan job {scan.id}: {e}")
+        scan.status = ScanStatus.FAILED
+        scan.error_message = "Failed to queue scan job. Please try again later."
+        scan.completed_at = datetime.utcnow()
+        db.commit()
+        db.refresh(scan)
+
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable. Failed to queue scan job. Please try again later."
+        )
 
     return scan_to_response(scan)
 
@@ -138,14 +191,15 @@ async def list_scans(
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
     status: Optional[str] = Query(None, description="Filter by status"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     List all scans for the current user.
 
     Supports pagination and filtering by status.
     """
-    # TODO: Filter by authenticated user
-    query = db.query(Scan)
+    # Filter by authenticated user
+    query = db.query(Scan).filter(Scan.user_id == current_user.id)
 
     # Filter by status
     if status:
@@ -174,11 +228,18 @@ async def list_scans(
 
 
 @router.get("/{scan_id}", response_model=ScanResponse)
-async def get_scan(scan_id: UUID, db: Session = Depends(get_db)):
+async def get_scan(
+    scan_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Get details of a specific scan.
     """
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    scan = db.query(Scan).filter(
+        Scan.id == scan_id,
+        Scan.user_id == current_user.id,
+    ).first()
 
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -187,11 +248,18 @@ async def get_scan(scan_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.delete("/{scan_id}", status_code=204)
-async def delete_scan(scan_id: UUID, db: Session = Depends(get_db)):
+async def delete_scan(
+    scan_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Delete a scan and all associated data.
     """
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    scan = db.query(Scan).filter(
+        Scan.id == scan_id,
+        Scan.user_id == current_user.id,
+    ).first()
 
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -210,19 +278,26 @@ async def get_scan_issues(
     impact: Optional[str] = Query(None, description="Filter by impact (critical,serious,moderate,minor)"),
     rule_id: Optional[str] = Query(None, description="Filter by rule ID"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get all issues found in a scan.
 
     Supports pagination and filtering by impact level or rule ID.
     """
-    # Verify scan exists
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    # Verify scan exists and belongs to current user (eager load pages to avoid N+1)
+    scan = db.query(Scan).options(
+        joinedload(Scan.pages)
+    ).filter(
+        Scan.id == scan_id,
+        Scan.user_id == current_user.id,
+    ).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    # Get page IDs for this scan
-    page_ids = [p.id for p in scan.pages]
+    # Build page URL map once (pages already loaded via joinedload)
+    page_url_map = {p.id: p.url for p in scan.pages}
+    page_ids = list(page_url_map.keys())
 
     if not page_ids:
         return IssueListResponse(
@@ -253,12 +328,6 @@ async def get_scan_issues(
         query = query.filter(Issue.rule_id == rule_id)
 
     # Order by impact severity
-    impact_order = {
-        ImpactLevel.CRITICAL: 0,
-        ImpactLevel.SERIOUS: 1,
-        ImpactLevel.MODERATE: 2,
-        ImpactLevel.MINOR: 3,
-    }
     query = query.order_by(Issue.impact, Issue.created_at)
 
     # Get total count
@@ -266,9 +335,6 @@ async def get_scan_issues(
 
     # Paginate
     issues = query.offset((page - 1) * per_page).limit(per_page).all()
-
-    # Get page URLs for issues
-    page_url_map = {p.id: p.url for p in scan.pages}
 
     issue_responses = []
     for issue in issues:
@@ -302,43 +368,74 @@ async def get_scan_issues(
     )
 
 
-@router.get("/{scan_id}/pages", response_model=list[PageResponse])
+@router.get("/{scan_id}/pages", response_model=PageListResponse)
 async def get_scan_pages(
     scan_id: UUID,
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(50, ge=1, le=200, description="Items per page"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get all pages scanned in a scan.
+
+    Supports pagination for scans with many pages.
     """
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    # Verify scan exists and belongs to current user
+    scan = db.query(Scan).filter(
+        Scan.id == scan_id,
+        Scan.user_id == current_user.id,
+    ).first()
 
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    return [
-        PageResponse(
-            id=page.id,
-            url=page.url,
-            title=page.title,
-            score=page.score,
-            issues_count=page.issues_count,
-            passed_rules=page.passed_rules,
-            failed_rules=page.failed_rules,
-            load_time_ms=page.load_time_ms,
-            scan_time_ms=page.scan_time_ms,
-            error=page.error,
-            scanned_at=page.scanned_at,
-        )
-        for page in scan.pages
-    ]
+    # Query pages with pagination
+    query = db.query(Page).filter(Page.scan_id == scan_id).order_by(Page.scanned_at)
+
+    # Get total count
+    total = query.count()
+
+    # Paginate
+    pages = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    return PageListResponse(
+        pages=[
+            PageResponse(
+                id=p.id,
+                url=p.url,
+                title=p.title,
+                score=p.score,
+                issues_count=p.issues_count,
+                passed_rules=p.passed_rules,
+                failed_rules=p.failed_rules,
+                load_time_ms=p.load_time_ms,
+                scan_time_ms=p.scan_time_ms,
+                error=p.error,
+                scanned_at=p.scanned_at,
+            )
+            for p in pages
+        ],
+        total=total,
+        page=page,
+        per_page=per_page,
+        total_pages=math.ceil(total / per_page) if total > 0 else 1,
+    )
 
 
 @router.post("/{scan_id}/cancel", response_model=ScanResponse)
-async def cancel_scan(scan_id: UUID, db: Session = Depends(get_db)):
+async def cancel_scan(
+    scan_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Cancel a running or queued scan.
     """
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    scan = db.query(Scan).filter(
+        Scan.id == scan_id,
+        Scan.user_id == current_user.id,
+    ).first()
 
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")

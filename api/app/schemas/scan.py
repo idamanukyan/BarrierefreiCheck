@@ -138,6 +138,16 @@ class PageResponse(BaseModel):
         from_attributes = True
 
 
+class PageListResponse(BaseModel):
+    """Schema for paginated page list response."""
+
+    pages: List[PageResponse]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
 class ScanSummaryResponse(BaseModel):
     """Schema for scan summary in reports."""
 

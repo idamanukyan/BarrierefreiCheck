@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from ..database import get_db
 from ..models import User, Subscription, Payment, UsageRecord, PlanType, SubscriptionStatus, PaymentStatus
 from ..config import settings
+from .auth import get_current_user
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -164,6 +165,34 @@ PLANS = {
             "api_access": True,
         },
     ),
+    "agency": PlanInfo(
+        id="agency",
+        name="Agency",
+        name_de="Agentur",
+        price=29900,  # 299.00 EUR
+        features=[
+            "Unlimited scans",
+            "Up to 1000 pages per scan",
+            "White-label reports",
+            "API access",
+            "Priority support",
+            "Multiple team members",
+        ],
+        features_de=[
+            "Unbegrenzte Scans",
+            "Bis zu 1000 Seiten pro Scan",
+            "White-Label-Berichte",
+            "API-Zugang",
+            "Prioritäts-Support",
+            "Mehrere Teammitglieder",
+        ],
+        limits={
+            "scans_per_month": -1,
+            "pages_per_scan": 1000,
+            "reports": True,
+            "api_access": True,
+        },
+    ),
     "enterprise": PlanInfo(
         id="enterprise",
         name="Enterprise",
@@ -171,6 +200,7 @@ PLANS = {
         price=0,  # Custom pricing
         features=[
             "Unlimited scans and pages",
+            "Up to 5000 pages per scan",
             "Dedicated infrastructure",
             "SLA guarantee",
             "Account manager",
@@ -178,6 +208,7 @@ PLANS = {
         ],
         features_de=[
             "Unbegrenzte Scans und Seiten",
+            "Bis zu 5000 Seiten pro Scan",
             "Dedizierte Infrastruktur",
             "SLA-Garantie",
             "Account Manager",
@@ -185,17 +216,12 @@ PLANS = {
         ],
         limits={
             "scans_per_month": -1,
-            "pages_per_scan": 500,
+            "pages_per_scan": 5000,
             "reports": True,
             "api_access": True,
         },
     ),
 }
-
-
-def get_current_user_id() -> str:
-    """Get current user ID (placeholder for auth)."""
-    return "demo-user-id"
 
 
 @router.get("/plans", response_model=List[PlanInfo])
@@ -213,9 +239,12 @@ async def get_plan(plan_id: str):
 
 
 @router.get("/subscription", response_model=SubscriptionResponse)
-async def get_subscription(db: Session = Depends(get_db)):
+async def get_subscription(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get current user's subscription."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     subscription = db.query(Subscription).filter(
         Subscription.user_id == user_id
@@ -248,9 +277,12 @@ async def get_subscription(db: Session = Depends(get_db)):
 
 
 @router.get("/usage", response_model=UsageResponse)
-async def get_usage(db: Session = Depends(get_db)):
+async def get_usage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get current billing period usage."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     # Get subscription for limits
     subscription = db.query(Subscription).filter(
@@ -304,9 +336,10 @@ async def get_usage(db: Session = Depends(get_db)):
 async def create_checkout_session(
     data: CreateCheckoutSession,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Create a Stripe checkout session for subscription upgrade."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     if data.plan not in ["starter", "professional"]:
         raise HTTPException(
@@ -327,9 +360,12 @@ async def create_checkout_session(
 
 
 @router.post("/subscription/cancel")
-async def cancel_subscription(db: Session = Depends(get_db)):
+async def cancel_subscription(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Cancel the current subscription."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     subscription = db.query(Subscription).filter(
         Subscription.user_id == user_id
@@ -350,9 +386,12 @@ async def cancel_subscription(db: Session = Depends(get_db)):
 
 
 @router.post("/subscription/reactivate")
-async def reactivate_subscription(db: Session = Depends(get_db)):
+async def reactivate_subscription(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Reactivate a canceled subscription."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     subscription = db.query(Subscription).filter(
         Subscription.user_id == user_id
@@ -378,9 +417,12 @@ async def reactivate_subscription(db: Session = Depends(get_db)):
 
 
 @router.get("/payments", response_model=PaymentListResponse)
-async def get_payments(db: Session = Depends(get_db)):
+async def get_payments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get payment history."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     subscription = db.query(Subscription).filter(
         Subscription.user_id == user_id

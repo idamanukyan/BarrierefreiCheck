@@ -5,6 +5,7 @@ Handles sending transactional emails for notifications and reports.
 """
 
 import smtplib
+import html
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -15,6 +16,13 @@ import logging
 from ..config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def escape_html(text: str) -> str:
+    """Escape HTML special characters to prevent XSS."""
+    if text is None:
+        return ""
+    return html.escape(str(text))
 
 
 class EmailService:
@@ -101,8 +109,14 @@ class EmailService:
         language: str = "de",
     ) -> bool:
         """Send scan completion notification."""
+        # Escape user-provided data to prevent XSS
+        safe_user_name = escape_html(user_name)
+        safe_scan_url = escape_html(scan_url)
+        safe_scan_id = escape_html(scan_id)
+        score_color = '#38a169' if score >= 70 else '#e53e3e'
+
         if language == "de":
-            subject = f"Scan abgeschlossen: {scan_url}"
+            subject = f"Scan abgeschlossen: {safe_scan_url}"
             html_content = f"""
             <!DOCTYPE html>
             <html>
@@ -112,7 +126,7 @@ class EmailService:
                     .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
                     .header {{ background: #2563eb; color: white; padding: 20px; text-align: center; }}
                     .content {{ padding: 20px; background: #f9fafb; }}
-                    .score {{ font-size: 48px; font-weight: bold; color: {'#38a169' if score >= 70 else '#e53e3e'}; }}
+                    .score {{ font-size: 48px; font-weight: bold; color: {score_color}; }}
                     .button {{ display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }}
                 </style>
             </head>
@@ -122,15 +136,15 @@ class EmailService:
                         <h1>Scan abgeschlossen</h1>
                     </div>
                     <div class="content">
-                        <p>Hallo {user_name},</p>
-                        <p>Ihr Barrierefreiheits-Scan für <strong>{scan_url}</strong> wurde abgeschlossen.</p>
+                        <p>Hallo {safe_user_name},</p>
+                        <p>Ihr Barrierefreiheits-Scan für <strong>{safe_scan_url}</strong> wurde abgeschlossen.</p>
 
                         <h2>Ergebnisse</h2>
-                        <p class="score">{score}%</p>
-                        <p>Gefundene Probleme: <strong>{issues_count}</strong></p>
+                        <p class="score">{int(score)}%</p>
+                        <p>Gefundene Probleme: <strong>{int(issues_count)}</strong></p>
 
                         <p>
-                            <a href="{settings.FRONTEND_URL}/scans/{scan_id}" class="button">
+                            <a href="{settings.FRONTEND_URL}/scans/{safe_scan_id}" class="button">
                                 Ergebnisse ansehen
                             </a>
                         </p>
@@ -142,7 +156,7 @@ class EmailService:
             </html>
             """
         else:
-            subject = f"Scan complete: {scan_url}"
+            subject = f"Scan complete: {safe_scan_url}"
             html_content = f"""
             <!DOCTYPE html>
             <html>
@@ -152,7 +166,7 @@ class EmailService:
                     .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
                     .header {{ background: #2563eb; color: white; padding: 20px; text-align: center; }}
                     .content {{ padding: 20px; background: #f9fafb; }}
-                    .score {{ font-size: 48px; font-weight: bold; color: {'#38a169' if score >= 70 else '#e53e3e'}; }}
+                    .score {{ font-size: 48px; font-weight: bold; color: {score_color}; }}
                     .button {{ display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }}
                 </style>
             </head>
@@ -162,15 +176,15 @@ class EmailService:
                         <h1>Scan Complete</h1>
                     </div>
                     <div class="content">
-                        <p>Hello {user_name},</p>
-                        <p>Your accessibility scan for <strong>{scan_url}</strong> has been completed.</p>
+                        <p>Hello {safe_user_name},</p>
+                        <p>Your accessibility scan for <strong>{safe_scan_url}</strong> has been completed.</p>
 
                         <h2>Results</h2>
-                        <p class="score">{score}%</p>
-                        <p>Issues found: <strong>{issues_count}</strong></p>
+                        <p class="score">{int(score)}%</p>
+                        <p>Issues found: <strong>{int(issues_count)}</strong></p>
 
                         <p>
-                            <a href="{settings.FRONTEND_URL}/scans/{scan_id}" class="button">
+                            <a href="{settings.FRONTEND_URL}/scans/{safe_scan_id}" class="button">
                                 View Results
                             </a>
                         </p>
@@ -194,8 +208,14 @@ class EmailService:
         language: str = "de",
     ) -> bool:
         """Send report ready notification."""
+        # Escape user-provided data to prevent XSS
+        safe_user_name = escape_html(user_name)
+        safe_scan_url = escape_html(scan_url)
+        safe_report_id = escape_html(report_id)
+        safe_format = escape_html(format).upper()
+
         if language == "de":
-            subject = f"Ihr Bericht ist fertig: {scan_url}"
+            subject = f"Ihr Bericht ist fertig: {safe_scan_url}"
             html_content = f"""
             <!DOCTYPE html>
             <html>
@@ -214,11 +234,11 @@ class EmailService:
                         <h1>Bericht bereit</h1>
                     </div>
                     <div class="content">
-                        <p>Hallo {user_name},</p>
-                        <p>Ihr {format.upper()}-Bericht für <strong>{scan_url}</strong> wurde erstellt und steht zum Download bereit.</p>
+                        <p>Hallo {safe_user_name},</p>
+                        <p>Ihr {safe_format}-Bericht für <strong>{safe_scan_url}</strong> wurde erstellt und steht zum Download bereit.</p>
 
                         <p>
-                            <a href="{settings.FRONTEND_URL}/reports/{report_id}/download" class="button">
+                            <a href="{settings.FRONTEND_URL}/reports/{safe_report_id}/download" class="button">
                                 Bericht herunterladen
                             </a>
                         </p>
@@ -232,7 +252,7 @@ class EmailService:
             </html>
             """
         else:
-            subject = f"Your report is ready: {scan_url}"
+            subject = f"Your report is ready: {safe_scan_url}"
             html_content = f"""
             <!DOCTYPE html>
             <html>
@@ -251,11 +271,11 @@ class EmailService:
                         <h1>Report Ready</h1>
                     </div>
                     <div class="content">
-                        <p>Hello {user_name},</p>
-                        <p>Your {format.upper()} report for <strong>{scan_url}</strong> has been generated and is ready for download.</p>
+                        <p>Hello {safe_user_name},</p>
+                        <p>Your {safe_format} report for <strong>{safe_scan_url}</strong> has been generated and is ready for download.</p>
 
                         <p>
-                            <a href="{settings.FRONTEND_URL}/reports/{report_id}/download" class="button">
+                            <a href="{settings.FRONTEND_URL}/reports/{safe_report_id}/download" class="button">
                                 Download Report
                             </a>
                         </p>

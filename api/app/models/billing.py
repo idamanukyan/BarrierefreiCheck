@@ -20,15 +20,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.models.user import PlanType
 import enum
-
-
-class PlanType(enum.Enum):
-    """Subscription plan types."""
-    FREE = "free"
-    STARTER = "starter"
-    PROFESSIONAL = "professional"
-    ENTERPRISE = "enterprise"
 
 
 class SubscriptionStatus(enum.Enum):
@@ -122,9 +115,17 @@ class Subscription(Base):
                 "white_label": True,
                 "priority_support": True,
             },
+            PlanType.AGENCY: {
+                "scans_per_month": -1,  # Unlimited
+                "pages_per_scan": 1000,
+                "reports": True,
+                "api_access": True,
+                "white_label": True,
+                "priority_support": True,
+            },
             PlanType.ENTERPRISE: {
                 "scans_per_month": -1,  # Unlimited
-                "pages_per_scan": 500,
+                "pages_per_scan": 5000,
                 "reports": True,
                 "api_access": True,
                 "white_label": True,

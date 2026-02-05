@@ -5,6 +5,7 @@ Manages environment variables and application settings.
 """
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 from typing import Optional
 
@@ -24,15 +25,17 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
 
     # JWT Authentication
-    jwt_secret: str = "dev-secret-change-in-production"
+    # SECURITY: jwt_secret MUST be set via environment variable in production
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
 
     # S3/MinIO
+    # SECURITY: s3_access_key and s3_secret_key MUST be set via environment variables
     s3_endpoint: str = "http://localhost:9000"
-    s3_access_key: str = "minioadmin"
-    s3_secret_key: str = "minioadmin"
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
     s3_bucket_screenshots: str = "screenshots"
     s3_bucket_reports: str = "reports"
 
@@ -59,6 +62,24 @@ class Settings(BaseSettings):
     scan_timeout_seconds: int = 300
     default_crawl_limit: int = 100
     max_crawl_limit: int = 1000
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def validate_jwt_secret(cls, v: str, info) -> str:
+        if not v or v == "":
+            # In development, generate a warning but allow startup
+            import warnings
+            warnings.warn(
+                "JWT_SECRET is not set! This is a critical security risk. "
+                "Set JWT_SECRET environment variable before deploying to production.",
+                UserWarning,
+            )
+            # Return a random secret for development only
+            import secrets
+            return secrets.token_urlsafe(32)
+        if len(v) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters long")
+        return v
 
     class Config:
         env_file = ".env"

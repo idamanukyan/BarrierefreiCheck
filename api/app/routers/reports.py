@@ -17,6 +17,7 @@ from ..database import get_db
 from ..models import User, Scan, Report, ReportFormat as ReportFormatEnum
 from ..services.report_generator import ReportGenerator, ReportFormat
 from ..services.email_service import EmailService
+from .auth import get_current_user
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -63,12 +64,6 @@ report_generator = ReportGenerator()
 email_service = EmailService()
 
 
-def get_current_user_id() -> str:
-    """Get current user ID (placeholder for auth)."""
-    # In production, this would extract user from JWT token
-    return "demo-user-id"
-
-
 async def generate_report_task(
     report_id: str,
     scan_data: dict,
@@ -111,13 +106,14 @@ async def create_report(
     report_data: ReportCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Generate a new report for a scan.
 
     The report is generated asynchronously. Use GET /reports/{id} to check status.
     """
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     # Validate format
     try:
@@ -229,9 +225,10 @@ async def list_reports(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List all reports for the current user."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     # Get total count
     total = db.query(Report).filter(Report.user_id == user_id).count()
@@ -269,9 +266,13 @@ async def list_reports(
 
 
 @router.get("/{report_id}", response_model=ReportResponse)
-async def get_report(report_id: str, db: Session = Depends(get_db)):
+async def get_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get report details by ID."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     report = db.query(Report).filter(
         Report.id == report_id,
@@ -295,9 +296,13 @@ async def get_report(report_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{report_id}/download")
-async def download_report(report_id: str, db: Session = Depends(get_db)):
+async def download_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Download a generated report."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     report = db.query(Report).filter(
         Report.id == report_id,
@@ -356,9 +361,13 @@ async def download_report(report_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{report_id}", status_code=204)
-async def delete_report(report_id: str, db: Session = Depends(get_db)):
+async def delete_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Delete a report."""
-    user_id = get_current_user_id()
+    user_id = str(current_user.id)
 
     report = db.query(Report).filter(
         Report.id == report_id,
