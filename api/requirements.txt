@@ -33,6 +33,12 @@ redis==5.0.1
 # Rate Limiting
 slowapi==0.1.9
 
+# Monitoring
+prometheus-client==0.19.0
+
+# WebSocket
+websockets==12.0
+
 # Email
 emails==0.6
 

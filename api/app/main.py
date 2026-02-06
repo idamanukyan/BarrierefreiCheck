@@ -16,7 +16,10 @@ from app.routers.reports import router as reports_router
 from app.routers.billing import router as billing_router
 from app.routers.auth import router as auth_router
 from app.routers.dashboard import router as dashboard_router
+from app.routers.websocket import router as websocket_router
+from app.routers.export import router as export_router
 from app.services.rate_limiter import limiter, rate_limit_exceeded_handler
+from app.services.metrics import MetricsMiddleware, get_metrics
 from app.middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware
 from app.middleware.correlation_id import setup_logging_with_correlation_id
 from app.exceptions import (
@@ -101,6 +104,9 @@ app.add_middleware(
     enable_hsts=settings.app_env == "production",
 )
 
+# Metrics middleware for Prometheus
+app.add_middleware(MetricsMiddleware)
+
 
 # Root endpoint
 @app.get("/")
@@ -127,9 +133,18 @@ async def health_check():
     }
 
 
+# Prometheus metrics endpoint
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return get_metrics()
+
+
 # Include routers
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(dashboard_router, prefix="/api/v1", tags=["Dashboard"])
 app.include_router(scans_router, prefix="/api/v1/scans", tags=["Scans"])
 app.include_router(reports_router, prefix="/api/v1", tags=["Reports"])
 app.include_router(billing_router, prefix="/api/v1", tags=["Billing"])
+app.include_router(export_router, prefix="/api/v1", tags=["Export"])
+app.include_router(websocket_router, prefix="/api/v1", tags=["WebSocket"])

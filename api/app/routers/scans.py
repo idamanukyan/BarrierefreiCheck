@@ -15,6 +15,8 @@ from sqlalchemy import desc, func
 import redis
 
 from app.database import get_db
+from app.services.cache import cache_get, cache_set, cache_delete
+from app.services.metrics import record_scan_created
 
 logger = logging.getLogger(__name__)
 from app.config import settings
@@ -33,6 +35,9 @@ from app.schemas.scan import (
     PageResponse,
     PageListResponse,
 )
+
+# Cache TTL for completed scans (5 minutes)
+SCAN_CACHE_TTL = 300
 
 router = APIRouter()
 
@@ -138,6 +143,9 @@ async def create_scan(
     db.commit()
     db.refresh(scan)
 
+    # Record metrics
+    record_scan_created()
+
     # Add job to Redis queue
     try:
         r = get_redis()
@@ -236,6 +244,14 @@ async def get_scan(
     """
     Get details of a specific scan.
     """
+    cache_key = f"scan:{scan_id}:{current_user.id}"
+
+    # Try cache for completed scans
+    cached = cache_get(cache_key)
+    if cached:
+        logger.debug(f"Cache hit for scan {scan_id}")
+        return ScanResponse(**cached)
+
     scan = db.query(Scan).filter(
         Scan.id == scan_id,
         Scan.user_id == current_user.id,
@@ -244,7 +260,13 @@ async def get_scan(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    return scan_to_response(scan)
+    response = scan_to_response(scan)
+
+    # Cache completed/failed scans (they won't change)
+    if scan.status in [ScanStatus.COMPLETED, ScanStatus.FAILED, ScanStatus.CANCELLED]:
+        cache_set(cache_key, response.model_dump(), SCAN_CACHE_TTL)
+
+    return response
 
 
 @router.delete("/{scan_id}", status_code=204)
@@ -266,6 +288,10 @@ async def delete_scan(
 
     db.delete(scan)
     db.commit()
+
+    # Invalidate cache
+    cache_key = f"scan:{scan_id}:{current_user.id}"
+    cache_delete(cache_key)
 
     return None
 
