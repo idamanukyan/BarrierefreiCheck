@@ -4,8 +4,9 @@ AccessibilityChecker API - Main Application Entry Point
 
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
@@ -16,10 +17,20 @@ from app.routers.billing import router as billing_router
 from app.routers.auth import router as auth_router
 from app.routers.dashboard import router as dashboard_router
 from app.services.rate_limiter import limiter, rate_limit_exceeded_handler
-from app.middleware import CorrelationIdMiddleware
+from app.middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware
 from app.middleware.correlation_id import setup_logging_with_correlation_id
+from app.exceptions import (
+    AppException,
+    app_exception_handler,
+    http_exception_handler,
+    generic_exception_handler,
+    validation_exception_handler,
+)
 
 logger = logging.getLogger(__name__)
+
+# Maximum request body size (10 MB)
+MAX_REQUEST_SIZE = 10 * 1024 * 1024
 
 
 @asynccontextmanager
@@ -62,7 +73,13 @@ for BFSG/WCAG 2.1 compliance.
 
 # Add rate limiter
 app.state.limiter = limiter
+
+# Exception handlers for structured error responses
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
 
 # CORS Configuration
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",")]
@@ -77,6 +94,12 @@ app.add_middleware(
 
 # Correlation ID middleware for request tracing
 app.add_middleware(CorrelationIdMiddleware)
+
+# Security headers middleware
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    enable_hsts=settings.app_env == "production",
+)
 
 
 # Root endpoint
