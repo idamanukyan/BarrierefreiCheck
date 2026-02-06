@@ -2,9 +2,11 @@
 AccessibilityChecker API - Main Application Entry Point
 """
 
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import init_db
@@ -13,18 +15,25 @@ from app.routers.reports import router as reports_router
 from app.routers.billing import router as billing_router
 from app.routers.auth import router as auth_router
 from app.routers.dashboard import router as dashboard_router
+from app.services.rate_limiter import limiter, rate_limit_exceeded_handler
+from app.middleware import CorrelationIdMiddleware
+from app.middleware.correlation_id import setup_logging_with_correlation_id
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    print("🚀 Starting AccessibilityChecker API...")
+    log_level = logging.DEBUG if settings.debug else logging.INFO
+    setup_logging_with_correlation_id(level=log_level)
+    logger.info("Starting AccessibilityChecker API...")
     init_db()
-    print("✅ Database initialized")
+    logger.info("Database initialized")
     yield
     # Shutdown
-    print("👋 Shutting down AccessibilityChecker API...")
+    logger.info("Shutting down AccessibilityChecker API...")
 
 
 app = FastAPI(
@@ -51,6 +60,10 @@ for BFSG/WCAG 2.1 compliance.
     lifespan=lifespan,
 )
 
+# Add rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
 # CORS Configuration
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",")]
 
@@ -61,6 +74,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Correlation ID middleware for request tracing
+app.add_middleware(CorrelationIdMiddleware)
 
 
 # Root endpoint
@@ -79,10 +95,12 @@ async def root():
 @app.get("/api/v1/health")
 async def health_check():
     """Health check endpoint"""
+    from app.middleware.correlation_id import get_correlation_id
     return {
         "status": "healthy",
         "version": "0.1.0",
         "environment": settings.app_env,
+        "correlation_id": get_correlation_id(),
     }
 
 

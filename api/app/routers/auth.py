@@ -6,7 +6,7 @@ Handles user registration, login, and token management.
 
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -16,6 +16,7 @@ from passlib.context import CryptContext
 from app.database import get_db
 from app.config import settings
 from app.models import User
+from app.services.rate_limiter import limiter, AUTH_RATE_LIMIT, REGISTER_RATE_LIMIT
 
 router = APIRouter()
 
@@ -124,7 +125,8 @@ async def get_current_user(
 
 # Routes
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit(REGISTER_RATE_LIMIT)
+async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user."""
     # Check if user exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
@@ -164,7 +166,8 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
     """Login and get access token."""
     user = db.query(User).filter(User.email == login_data.email).first()
     if not user or not verify_password(login_data.password, user.password_hash):
@@ -203,16 +206,19 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login/form", response_model=Token)
+@limiter.limit(AUTH_RATE_LIMIT)
 async def login_form(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     """Login with form data (for OAuth2 compatibility)."""
-    return await login(LoginRequest(email=form_data.username, password=form_data.password), db)
+    return await login(request, LoginRequest(email=form_data.username, password=form_data.password), db)
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_data: RefreshRequest, db: Session = Depends(get_db)):
+@limiter.limit(AUTH_RATE_LIMIT)
+async def refresh_token(request: Request, refresh_data: RefreshRequest, db: Session = Depends(get_db)):
     """Refresh access token using refresh token."""
     try:
         payload = jwt.decode(

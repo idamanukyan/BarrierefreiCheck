@@ -4,6 +4,7 @@ Dashboard Router
 API endpoints for dashboard statistics.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import List
 from fastapi import APIRouter, Depends
@@ -12,9 +13,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from ..database import get_db
-from ..models import Scan, ScanStatus
+from ..models import Scan, ScanStatus, User
+from ..routers.auth import get_current_user
+from ..services.cache import cache_get, cache_set, cache_delete_pattern
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+# Cache TTL for dashboard stats (60 seconds)
+DASHBOARD_CACHE_TTL = 60
 
 
 class RecentScan(BaseModel):
@@ -43,27 +51,43 @@ class DashboardStats(BaseModel):
 
 
 @router.get("/stats", response_model=DashboardStats)
-async def get_dashboard_stats(db: Session = Depends(get_db)):
-    """Get dashboard statistics."""
+async def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get dashboard statistics for the current user."""
+    user_id = str(current_user.id)
+    cache_key = f"dashboard:stats:{user_id}"
+
+    # Try to get from cache
+    cached_stats = cache_get(cache_key)
+    if cached_stats:
+        logger.debug(f"Dashboard stats cache hit for user {user_id}")
+        return DashboardStats(**cached_stats)
+
+    logger.debug(f"Dashboard stats cache miss for user {user_id}")
+
+    # Base query filtered by user
+    user_scans = db.query(Scan).filter(Scan.user_id == current_user.id)
 
     # Get total scans
-    total_scans = db.query(func.count(Scan.id)).scalar() or 0
+    total_scans = user_scans.with_entities(func.count(Scan.id)).scalar() or 0
 
     # Get total pages scanned
-    pages_scanned = db.query(func.sum(Scan.pages_scanned)).scalar() or 0
+    pages_scanned = user_scans.with_entities(func.sum(Scan.pages_scanned)).scalar() or 0
 
     # Get total issues
-    issues_found = db.query(func.sum(Scan.issues_count)).scalar() or 0
+    issues_found = user_scans.with_entities(func.sum(Scan.issues_count)).scalar() or 0
 
     # Get average score (only from completed scans with scores)
-    avg_score_result = db.query(func.avg(Scan.score)).filter(
+    avg_score_result = user_scans.filter(
         Scan.status == ScanStatus.COMPLETED,
         Scan.score.isnot(None)
-    ).scalar()
+    ).with_entities(func.avg(Scan.score)).scalar()
     average_score = float(avg_score_result) if avg_score_result else 0.0
 
     # Get recent scans (last 5)
-    recent_scans_query = db.query(Scan).order_by(
+    recent_scans_query = user_scans.order_by(
         Scan.created_at.desc()
     ).limit(5).all()
 
@@ -79,12 +103,12 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         for scan in recent_scans_query
     ]
 
-    # Get issues by impact (aggregate from completed scans)
+    # Get issues by impact (aggregate from user's completed scans)
     issues_by_impact = {
-        "critical": db.query(func.sum(Scan.issues_critical)).scalar() or 0,
-        "serious": db.query(func.sum(Scan.issues_serious)).scalar() or 0,
-        "moderate": db.query(func.sum(Scan.issues_moderate)).scalar() or 0,
-        "minor": db.query(func.sum(Scan.issues_minor)).scalar() or 0,
+        "critical": user_scans.with_entities(func.sum(Scan.issues_critical)).scalar() or 0,
+        "serious": user_scans.with_entities(func.sum(Scan.issues_serious)).scalar() or 0,
+        "moderate": user_scans.with_entities(func.sum(Scan.issues_moderate)).scalar() or 0,
+        "minor": user_scans.with_entities(func.sum(Scan.issues_minor)).scalar() or 0,
     }
 
     # Issues by WCAG level (placeholder - would need to aggregate from issues table)
@@ -94,25 +118,37 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         "AAA": 0,
     }
 
-    # Score history (last 30 days, daily average)
+    # Score history (last 30 days, daily average) - optimized to single query
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    score_history_query = db.query(
+        func.date(Scan.completed_at).label('date'),
+        func.avg(Scan.score).label('avg_score')
+    ).filter(
+        Scan.user_id == current_user.id,
+        Scan.status == ScanStatus.COMPLETED,
+        Scan.score.isnot(None),
+        Scan.completed_at >= thirty_days_ago
+    ).group_by(
+        func.date(Scan.completed_at)
+    ).order_by(
+        func.date(Scan.completed_at)
+    ).all()
+
+    # Convert to dict for easy lookup
+    score_by_date = {str(row.date): round(float(row.avg_score), 1) for row in score_history_query}
+
+    # Build score history with all dates
     score_history = []
     for i in range(30, -1, -1):
         date = datetime.utcnow() - timedelta(days=i)
         date_str = date.strftime("%Y-%m-%d")
-
-        daily_avg = db.query(func.avg(Scan.score)).filter(
-            Scan.status == ScanStatus.COMPLETED,
-            Scan.score.isnot(None),
-            func.date(Scan.completed_at) == date.date()
-        ).scalar()
-
-        if daily_avg is not None:
+        if date_str in score_by_date:
             score_history.append(ScoreHistoryItem(
                 date=date_str,
-                score=round(float(daily_avg), 1)
+                score=score_by_date[date_str]
             ))
 
-    # If no history, add some placeholder data
+    # If no history, add placeholder data
     if not score_history:
         today = datetime.utcnow()
         for i in range(7, -1, -1):
@@ -122,7 +158,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
                 score=0.0
             ))
 
-    return DashboardStats(
+    result = DashboardStats(
         totalScans=total_scans,
         pagesScanned=pages_scanned,
         issuesFound=issues_found,
@@ -132,3 +168,13 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         issuesByWcag=issues_by_wcag,
         scoreHistory=score_history,
     )
+
+    # Cache the result
+    cache_set(cache_key, result.model_dump(), DASHBOARD_CACHE_TTL)
+
+    return result
+
+
+def invalidate_user_dashboard_cache(user_id: str) -> None:
+    """Invalidate dashboard cache for a user. Call after scan updates."""
+    cache_delete_pattern(f"dashboard:stats:{user_id}")
