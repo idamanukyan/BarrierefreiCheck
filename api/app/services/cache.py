@@ -92,6 +92,55 @@ def cache_delete_pattern(pattern: str) -> int:
     return 0
 
 
+def cache_exists(key: str) -> bool:
+    """Check if key exists in cache."""
+    client = get_redis_client()
+    if client is None:
+        return False
+    try:
+        return client.exists(key) > 0
+    except redis.RedisError as e:
+        logger.warning(f"Cache exists error for key {key}: {e}")
+    return False
+
+
+# Token blacklist functions
+def blacklist_token(token: str, ttl_seconds: int) -> bool:
+    """
+    Add a token to the blacklist.
+
+    Used for logout to invalidate JWT tokens before their natural expiry.
+    TTL should match the remaining lifetime of the token.
+    """
+    if ttl_seconds <= 0:
+        return True  # Token already expired, no need to blacklist
+
+    client = get_redis_client()
+    if client is None:
+        logger.warning("Redis unavailable - token blacklist not persisted")
+        return False
+    try:
+        key = f"token_blacklist:{token}"
+        client.setex(key, ttl_seconds, "1")
+        logger.debug(f"Token blacklisted for {ttl_seconds}s")
+        return True
+    except redis.RedisError as e:
+        logger.error(f"Failed to blacklist token: {e}")
+    return False
+
+
+def is_token_blacklisted(token: str) -> bool:
+    """Check if a token has been blacklisted (logged out)."""
+    client = get_redis_client()
+    if client is None:
+        return False  # Fail open if Redis unavailable (could also fail closed)
+    try:
+        return client.exists(f"token_blacklist:{token}") > 0
+    except redis.RedisError as e:
+        logger.warning(f"Failed to check token blacklist: {e}")
+    return False
+
+
 def cached(key_prefix: str, ttl_seconds: int = 300):
     """
     Decorator for caching function results.

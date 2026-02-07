@@ -20,6 +20,13 @@ import {
   getRedisConnection,
 } from './queue.js';
 import { PageScanResult, AccessibilityIssue, ScanSummary } from '../axe/types.js';
+import {
+  persistScanResults,
+  markScanFailed,
+  updateScanStatus,
+  updateScanProgress,
+  closePool,
+} from '../utils/database.js';
 
 export interface ScanResult {
   scanId: string;
@@ -160,6 +167,13 @@ async function processScanJob(job: Job<ScanJobData>): Promise<ScanResult> {
 
   logger.info(`Processing scan job: ${scanId} for ${url}`);
 
+  // Update scan status to indicate processing started
+  try {
+    await updateScanStatus(scanId, 'scanning');
+  } catch (dbError) {
+    logger.warn(`Failed to update scan status: ${dbError}`);
+  }
+
   // Validate URL
   const validation = validateUrl(url);
   if (!validation.valid || !validation.url) {
@@ -282,6 +296,21 @@ async function processScanJob(job: Job<ScanJobData>): Promise<ScanResult> {
   const scanDuration = Date.now() - startTime;
   const summary = calculateSummary(scanId, baseUrl, pages, scanDuration);
 
+  // Persist results to database
+  try {
+    await persistScanResults(scanId, pages, summary);
+    logger.info(`Scan results persisted to database: ${scanId}`);
+  } catch (dbError) {
+    logger.error(`Failed to persist scan results: ${dbError}`);
+    // Mark scan as failed if we can't persist results
+    try {
+      await markScanFailed(scanId, 'Failed to save scan results to database');
+    } catch (e) {
+      logger.error(`Failed to mark scan as failed: ${e}`);
+    }
+    throw new Error(`Failed to persist scan results: ${dbError}`);
+  }
+
   // Final progress update
   await job.updateProgress({
     stage: 'complete',
@@ -329,8 +358,18 @@ export function createScanWorker(concurrency: number = 2): Worker<ScanJobData, S
     );
   });
 
-  worker.on('failed', (job, err) => {
+  worker.on('failed', async (job, err) => {
     logger.error(`Job ${job?.id} failed:`, err);
+
+    // Mark scan as failed in database
+    if (job?.data?.scanId) {
+      try {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        await markScanFailed(job.data.scanId, errorMessage);
+      } catch (dbError) {
+        logger.error(`Failed to mark scan as failed in database:`, dbError);
+      }
+    }
   });
 
   worker.on('progress', (job, progress) => {
@@ -357,6 +396,7 @@ export async function shutdownWorker(worker: Worker): Promise<void> {
 
   await worker.close();
   await closeBrowserManager();
+  await closePool();
 
   logger.info('Scan worker shut down complete');
 }

@@ -17,10 +17,12 @@
     "ioredis": "^5.3.2",
     "dotenv": "^16.3.1",
     "winston": "^3.11.0",
-    "robots-parser": "^3.0.1"
+    "robots-parser": "^3.0.1",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "@types/node": "^20.10.8",
+    "@types/pg": "^8.10.9",
     "typescript": "^5.3.3",
     "tsx": "^4.7.0",
     "vitest": "^1.2.0",

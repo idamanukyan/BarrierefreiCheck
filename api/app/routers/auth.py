@@ -4,11 +4,12 @@ Authentication Router
 Handles user registration, login, and token management.
 """
 
-from datetime import datetime, timedelta
+import re
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -17,6 +18,7 @@ from app.database import get_db
 from app.config import settings
 from app.models import User
 from app.services.rate_limiter import limiter, AUTH_RATE_LIMIT, REGISTER_RATE_LIMIT
+from app.services.cache import blacklist_token, is_token_blacklisted
 
 router = APIRouter()
 
@@ -27,6 +29,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
+# Password validation constants
+MIN_PASSWORD_LENGTH = 8
+PASSWORD_PATTERN = re.compile(
+    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$'
+)
+
+
 # Pydantic schemas
 class UserCreate(BaseModel):
     email: EmailStr
@@ -34,6 +43,27 @@ class UserCreate(BaseModel):
     name: Optional[str] = None  # Accept 'name' from frontend
     full_name: Optional[str] = None
     company: Optional[str] = None
+
+    @field_validator('password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """
+        Validate password meets security requirements:
+        - At least 8 characters
+        - Contains at least one uppercase letter
+        - Contains at least one lowercase letter
+        - Contains at least one digit
+        """
+        if len(v) < MIN_PASSWORD_LENGTH:
+            raise ValueError(
+                f'Password must be at least {MIN_PASSWORD_LENGTH} characters long'
+            )
+        if not PASSWORD_PATTERN.match(v):
+            raise ValueError(
+                'Password must contain at least one uppercase letter, '
+                'one lowercase letter, and one digit'
+            )
+        return v
 
     def get_full_name(self) -> Optional[str]:
         return self.full_name or self.name
@@ -88,14 +118,14 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.jwt_access_token_expire_minutes))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.jwt_access_token_expire_minutes))
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=settings.jwt_refresh_token_expire_days)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
@@ -109,6 +139,15 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # Check if token has been blacklisted (logged out)
+    if is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         email: str = payload.get("sub")
@@ -184,7 +223,7 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
         )
 
     # Update last login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     db.commit()
 
     # Create access token
@@ -273,7 +312,30 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
-    """Logout (client should discard tokens)."""
-    # In a production app, you might want to blacklist the token
+async def logout(
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Logout and invalidate the current access token.
+
+    The token is added to a blacklist in Redis until its natural expiry.
+    Client should also discard stored tokens.
+    """
+    try:
+        # Decode token to get expiry time
+        payload = jwt.decode(
+            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+        )
+        exp_timestamp = payload.get("exp", 0)
+        current_timestamp = datetime.now(timezone.utc).timestamp()
+        ttl_seconds = int(exp_timestamp - current_timestamp)
+
+        # Blacklist the token for its remaining lifetime
+        blacklist_token(token, ttl_seconds)
+
+    except JWTError:
+        # Token is invalid anyway, just return success
+        pass
+
     return {"message": "Successfully logged out"}

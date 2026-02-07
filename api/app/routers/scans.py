@@ -7,16 +7,16 @@ API endpoints for accessibility scan management.
 import math
 import logging
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, func
-import redis
 
 from app.database import get_db
 from app.services.cache import cache_get, cache_set, cache_delete
 from app.services.metrics import record_scan_created
+from app.services.queue import add_scan_job, cancel_job
 
 logger = logging.getLogger(__name__)
 from app.config import settings
@@ -40,10 +40,6 @@ from app.schemas.scan import (
 SCAN_CACHE_TTL = 300
 
 router = APIRouter()
-
-# Redis connection for job queue
-def get_redis():
-    return redis.from_url(settings.redis_url)
 
 
 def scan_to_response(scan: Scan) -> ScanResponse:
@@ -78,7 +74,7 @@ def scan_to_response(scan: Scan) -> ScanResponse:
 
 def get_current_month_scan_count(db: Session, user_id: UUID) -> int:
     """Get the number of scans the user has created in the current month."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     count = db.query(func.count(Scan.id)).filter(
@@ -146,42 +142,25 @@ async def create_scan(
     # Record metrics
     record_scan_created()
 
-    # Add job to Redis queue
-    try:
-        r = get_redis()
-        job_data = {
-            "scanId": str(scan.id),
-            "url": scan_data.url,
-            "crawl": scan_data.crawl,
-            "maxPages": effective_max_pages,
-            "userId": str(user_id),
-            "options": {
-                "captureScreenshots": True,
-                "respectRobotsTxt": True,
-            },
-        }
+    # Add job to Redis queue using proper BullMQ format
+    success = add_scan_job(
+        scan_id=scan.id,
+        url=scan_data.url,
+        crawl=scan_data.crawl,
+        max_pages=effective_max_pages,
+        user_id=user_id,
+        options={
+            "captureScreenshots": True,
+            "respectRobotsTxt": True,
+        },
+    )
 
-        # Push to BullMQ-compatible queue
-        # BullMQ uses a specific Redis key structure
-        import json
-        job_id = str(scan.id)
-        job = {
-            "name": f"scan-{job_id}",
-            "data": job_data,
-            "opts": {
-                "jobId": job_id,
-                "attempts": 3,
-            },
-        }
-        r.rpush("bull:accessibility-scans:wait", json.dumps(job))
-        logger.info(f"Scan job {job_id} queued successfully for URL: {scan_data.url}")
-
-    except Exception as e:
+    if not success:
         # Mark scan as failed since job couldn't be queued
-        logger.error(f"Failed to queue scan job {scan.id}: {e}")
+        logger.error(f"Failed to queue scan job {scan.id}")
         scan.status = ScanStatus.FAILED
         scan.error_message = "Failed to queue scan job. Please try again later."
-        scan.completed_at = datetime.utcnow()
+        scan.completed_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(scan)
 
@@ -473,10 +452,11 @@ async def cancel_scan(
         )
 
     scan.status = ScanStatus.CANCELLED
-    scan.completed_at = datetime.utcnow()
+    scan.completed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(scan)
 
-    # TODO: Remove job from queue if still pending
+    # Remove job from queue if still pending
+    cancel_job(scan_id)
 
     return scan_to_response(scan)

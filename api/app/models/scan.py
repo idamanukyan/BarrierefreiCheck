@@ -17,6 +17,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SQLEnum,
     JSON,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
@@ -54,6 +55,12 @@ class Scan(Base):
     """Scan model for accessibility scan jobs."""
 
     __tablename__ = "scans"
+
+    # Composite indexes for common query patterns
+    __table_args__ = (
+        Index('ix_scans_user_id_status', 'user_id', 'status'),
+        Index('ix_scans_user_id_created_at', 'user_id', 'created_at'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
