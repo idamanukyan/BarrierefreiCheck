@@ -5,7 +5,7 @@ API endpoints for dashboard statistics.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-# Cache TTL for dashboard stats (60 seconds)
+# Cache TTL for dashboard stats (60 seconds fresh, 30 seconds stale)
 DASHBOARD_CACHE_TTL = 60
+DASHBOARD_STALE_TTL = 30
 
 
 class RecentScan(BaseModel):
@@ -119,7 +120,7 @@ async def get_dashboard_stats(
     }
 
     # Score history (last 30 days, daily average) - optimized to single query
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     score_history_query = db.query(
         func.date(Scan.completed_at).label('date'),
         func.avg(Scan.score).label('avg_score')
@@ -140,7 +141,7 @@ async def get_dashboard_stats(
     # Build score history with all dates
     score_history = []
     for i in range(30, -1, -1):
-        date = datetime.utcnow() - timedelta(days=i)
+        date = datetime.now(timezone.utc) - timedelta(days=i)
         date_str = date.strftime("%Y-%m-%d")
         if date_str in score_by_date:
             score_history.append(ScoreHistoryItem(
@@ -150,7 +151,7 @@ async def get_dashboard_stats(
 
     # If no history, add placeholder data
     if not score_history:
-        today = datetime.utcnow()
+        today = datetime.now(timezone.utc)
         for i in range(7, -1, -1):
             date = today - timedelta(days=i)
             score_history.append(ScoreHistoryItem(

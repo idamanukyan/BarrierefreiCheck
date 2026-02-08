@@ -7,7 +7,9 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useAuthStore } from './store/authStore';
+import ErrorFallback from './components/common/ErrorFallback';
 import './i18n';
 
 // Layouts
@@ -80,11 +82,17 @@ const PublicRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 };
 
 const App: React.FC = () => {
+  const handleErrorReset = () => {
+    // Clear any cached state that might have caused the error
+    window.location.href = '/';
+  };
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+    <ErrorBoundary FallbackComponent={ErrorFallback} onReset={handleErrorReset}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
             {/* Public landing page */}
             <Route path="/" element={<Landing />} />
 
@@ -163,13 +171,24 @@ const App: React.FC = () => {
             >
               <Route index element={<Settings />} />
             </Route>
+            <Route
+              path="/billing"
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Billing />} />
+            </Route>
 
             {/* 404 redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </QueryClientProvider>
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 

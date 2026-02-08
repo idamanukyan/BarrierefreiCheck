@@ -17,6 +17,7 @@ from app.database import get_db
 from app.services.cache import cache_get, cache_set, cache_delete
 from app.services.metrics import record_scan_created
 from app.services.queue import add_scan_job, cancel_job
+from app.utils.validators import validate_scan_url, URLValidationError
 
 logger = logging.getLogger(__name__)
 from app.config import settings
@@ -102,6 +103,15 @@ async def create_scan(
     user_id = current_user.id
     plan_limits = current_user.plan_limits
 
+    # Validate URL for SSRF protection
+    try:
+        _, validated_url, _ = validate_scan_url(scan_data.url)
+    except URLValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
     # Check monthly scan limit
     scans_per_month = plan_limits.get("scans_per_month", 3)
     if scans_per_month != -1:  # -1 means unlimited
@@ -126,10 +136,10 @@ async def create_scan(
     # Enforce the limit on max_pages
     effective_max_pages = min(scan_data.max_pages, pages_per_scan_limit)
 
-    # Create scan record
+    # Create scan record with validated URL
     scan = Scan(
         user_id=user_id,
-        url=scan_data.url,
+        url=validated_url,
         crawl=scan_data.crawl,
         max_pages=effective_max_pages,
         status=ScanStatus.QUEUED,
@@ -145,7 +155,7 @@ async def create_scan(
     # Add job to Redis queue using proper BullMQ format
     success = add_scan_job(
         scan_id=scan.id,
-        url=scan_data.url,
+        url=validated_url,
         crawl=scan_data.crawl,
         max_pages=effective_max_pages,
         user_id=user_id,

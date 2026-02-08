@@ -181,3 +181,148 @@ def cached(key_prefix: str, ttl_seconds: int = 300):
             return result
         return wrapper
     return decorator
+
+
+def cache_get_with_stale(key: str) -> tuple[Optional[Any], bool]:
+    """
+    Get value from cache with stale flag.
+
+    Returns a tuple of (value, is_stale).
+    Stale values can be returned while revalidation happens in the background.
+    """
+    client = get_redis_client()
+    if client is None:
+        return None, False
+    try:
+        # Get value and its TTL
+        pipe = client.pipeline()
+        pipe.get(key)
+        pipe.ttl(key)
+        results = pipe.execute()
+
+        value_str = results[0]
+        ttl = results[1]
+
+        if value_str:
+            value = json.loads(value_str)
+            # Consider stale if less than 20% of original TTL remains
+            # We store original TTL in metadata
+            meta_key = f"{key}:meta"
+            original_ttl_str = client.get(meta_key)
+            if original_ttl_str:
+                original_ttl = int(original_ttl_str)
+                stale_threshold = original_ttl * 0.2
+                is_stale = ttl > 0 and ttl < stale_threshold
+            else:
+                is_stale = False
+            return value, is_stale
+    except (redis.RedisError, json.JSONDecodeError) as e:
+        logger.warning(f"Cache get with stale error for key {key}: {e}")
+    return None, False
+
+
+def cache_set_with_stale(key: str, value: Any, ttl_seconds: int = 300) -> bool:
+    """
+    Set value in cache with stale tracking.
+
+    Stores the original TTL in a metadata key for stale detection.
+    """
+    client = get_redis_client()
+    if client is None:
+        return False
+    try:
+        pipe = client.pipeline()
+        pipe.setex(key, ttl_seconds, json.dumps(value, default=str))
+        pipe.setex(f"{key}:meta", ttl_seconds + 60, str(ttl_seconds))  # Keep meta slightly longer
+        pipe.execute()
+        return True
+    except (redis.RedisError, TypeError) as e:
+        logger.warning(f"Cache set with stale error for key {key}: {e}")
+    return False
+
+
+def cached_with_stale(
+    key_prefix: str,
+    ttl_seconds: int = 300,
+    stale_ttl_seconds: int = 60,
+):
+    """
+    Decorator implementing stale-while-revalidate caching pattern.
+
+    Returns stale data immediately while refreshing in the background.
+    This prevents cache stampede and provides better user experience.
+
+    Args:
+        key_prefix: Prefix for the cache key
+        ttl_seconds: Time before data becomes stale
+        stale_ttl_seconds: Additional time to serve stale data while revalidating
+
+    Usage:
+        @cached_with_stale("dashboard:stats", ttl_seconds=60, stale_ttl_seconds=30)
+        async def get_dashboard_stats(user_id: str):
+            ...
+    """
+    import asyncio
+
+    def decorator(func):
+        # Keep track of ongoing revalidations to prevent duplicate work
+        _revalidating: set = set()
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Build cache key from prefix and arguments
+            key_parts = [key_prefix]
+            key_parts.extend(str(arg) for arg in args if arg is not None)
+            key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()) if v is not None)
+            cache_key = ":".join(key_parts)
+
+            # Try to get from cache
+            cached_value = cache_get(cache_key)
+
+            if cached_value is not None:
+                # Check if we should revalidate in background
+                client = get_redis_client()
+                if client:
+                    try:
+                        ttl = client.ttl(cache_key)
+                        # If TTL is low (entering stale period), trigger background refresh
+                        if ttl > 0 and ttl < stale_ttl_seconds and cache_key not in _revalidating:
+                            _revalidating.add(cache_key)
+
+                            async def revalidate():
+                                try:
+                                    result = await func(*args, **kwargs)
+                                    cache_value = _convert_to_cacheable(result)
+                                    cache_set(cache_key, cache_value, ttl_seconds + stale_ttl_seconds)
+                                    logger.debug(f"Background revalidation complete for {cache_key}")
+                                except Exception as e:
+                                    logger.warning(f"Background revalidation failed for {cache_key}: {e}")
+                                finally:
+                                    _revalidating.discard(cache_key)
+
+                            # Schedule background revalidation (fire and forget)
+                            asyncio.create_task(revalidate())
+                    except redis.RedisError:
+                        pass
+
+                logger.debug(f"Cache hit for {cache_key}")
+                return cached_value
+
+            # Cache miss - fetch fresh data
+            result = await func(*args, **kwargs)
+            cache_value = _convert_to_cacheable(result)
+            cache_set(cache_key, cache_value, ttl_seconds + stale_ttl_seconds)
+            logger.debug(f"Cache miss for {cache_key}, cached result")
+            return result
+
+        return wrapper
+    return decorator
+
+
+def _convert_to_cacheable(value: Any) -> Any:
+    """Convert a value to a cacheable format."""
+    if hasattr(value, 'model_dump'):
+        return value.model_dump()
+    elif hasattr(value, 'dict'):
+        return value.dict()
+    return value

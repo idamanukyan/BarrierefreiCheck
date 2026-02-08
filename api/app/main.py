@@ -20,7 +20,12 @@ from app.routers.websocket import router as websocket_router
 from app.routers.export import router as export_router
 from app.services.rate_limiter import limiter, rate_limit_exceeded_handler
 from app.services.metrics import MetricsMiddleware, get_metrics
-from app.middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware
+from app.middleware import (
+    CorrelationIdMiddleware,
+    SecurityHeadersMiddleware,
+    APIVersionMiddleware,
+    RequestSizeLimitMiddleware,
+)
 from app.middleware.correlation_id import setup_logging_with_correlation_id
 from app.exceptions import (
     AppException,
@@ -107,6 +112,16 @@ app.add_middleware(
 # Metrics middleware for Prometheus
 app.add_middleware(MetricsMiddleware)
 
+# API versioning middleware
+app.add_middleware(
+    APIVersionMiddleware,
+    current_version="1",
+    deprecated_versions={},  # Add versions here when deprecating, e.g., {"1": "2026-12-31"}
+)
+
+# Request size limit middleware (10MB max)
+app.add_middleware(RequestSizeLimitMiddleware, max_size_bytes=MAX_REQUEST_SIZE)
+
 
 # Root endpoint
 @app.get("/")
@@ -120,17 +135,40 @@ async def root():
     }
 
 
-# Health check
+# Health check endpoints
 @app.get("/api/v1/health")
 async def health_check():
-    """Health check endpoint"""
-    from app.middleware.correlation_id import get_correlation_id
-    return {
-        "status": "healthy",
-        "version": "0.1.0",
-        "environment": settings.app_env,
-        "correlation_id": get_correlation_id(),
-    }
+    """
+    Simple health check endpoint.
+
+    Used for load balancer probes. Only checks if the app is running.
+    For detailed health status, use /api/v1/health/deep
+    """
+    from app.services.health import get_simple_health
+    return await get_simple_health()
+
+
+@app.get("/api/v1/health/deep")
+async def health_check_deep():
+    """
+    Deep health check endpoint.
+
+    Checks connectivity to all dependencies:
+    - Database (PostgreSQL)
+    - Cache (Redis)
+    - Storage (MinIO)
+
+    Returns detailed status and latency information.
+    """
+    from app.services.health import get_system_health
+    from fastapi.responses import JSONResponse
+
+    health = await get_system_health()
+
+    # Return 503 if system is unhealthy
+    status_code = 200 if health["status"] != "unhealthy" else 503
+
+    return JSONResponse(content=health, status_code=status_code)
 
 
 # Prometheus metrics endpoint
