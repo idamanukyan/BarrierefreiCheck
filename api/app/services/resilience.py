@@ -194,6 +194,8 @@ def retry_with_backoff(
 
 
 # Pre-configured circuit breakers for external services
+
+# Stripe payment API - higher threshold, longer recovery
 stripe_circuit_breaker = CircuitBreaker(
     name="stripe",
     failure_threshold=5,
@@ -201,6 +203,7 @@ stripe_circuit_breaker = CircuitBreaker(
     expected_exceptions=(Exception,),
 )
 
+# MinIO/S3 storage - moderate threshold
 minio_circuit_breaker = CircuitBreaker(
     name="minio",
     failure_threshold=3,
@@ -208,9 +211,107 @@ minio_circuit_breaker = CircuitBreaker(
     expected_exceptions=(Exception,),
 )
 
+# Redis cache - low threshold, quick recovery (critical for auth)
 redis_circuit_breaker = CircuitBreaker(
     name="redis",
     failure_threshold=3,
     recovery_timeout=10,
     expected_exceptions=(Exception,),
 )
+
+# Email service - higher threshold (non-critical)
+email_circuit_breaker = CircuitBreaker(
+    name="email",
+    failure_threshold=5,
+    recovery_timeout=60,
+    expected_exceptions=(Exception,),
+)
+
+# Database - very low threshold, quick recovery (critical)
+database_circuit_breaker = CircuitBreaker(
+    name="database",
+    failure_threshold=2,
+    recovery_timeout=5,
+    expected_exceptions=(Exception,),
+)
+
+
+def with_circuit_breaker(breaker: CircuitBreaker, fallback_value: Any = None):
+    """
+    Decorator that wraps a function with circuit breaker and optional fallback.
+
+    If the circuit is open and a fallback_value is provided, returns the fallback
+    instead of raising CircuitBreakerError.
+
+    Usage:
+        @with_circuit_breaker(redis_circuit_breaker, fallback_value=None)
+        async def get_from_cache(key):
+            ...
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args, **kwargs) -> Any:
+            try:
+                # Apply circuit breaker
+                wrapped = breaker(func)
+                return await wrapped(*args, **kwargs)
+            except CircuitBreakerError:
+                if fallback_value is not None:
+                    logger.info(
+                        f"Circuit breaker '{breaker.name}' open, returning fallback value"
+                    )
+                    return fallback_value
+                raise
+        return wrapper
+    return decorator
+
+
+def sync_with_circuit_breaker(breaker: CircuitBreaker, fallback_value: Any = None):
+    """
+    Synchronous version of circuit breaker wrapper for non-async functions.
+
+    Usage:
+        @sync_with_circuit_breaker(redis_circuit_breaker, fallback_value=None)
+        def get_from_cache_sync(key):
+            ...
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            # Check circuit state synchronously
+            if breaker._state == CircuitState.OPEN:
+                if breaker._last_failure_time and \
+                   time.time() - breaker._last_failure_time >= breaker.recovery_timeout:
+                    breaker._state = CircuitState.HALF_OPEN
+                else:
+                    if fallback_value is not None:
+                        logger.info(
+                            f"Circuit breaker '{breaker.name}' open, returning fallback"
+                        )
+                        return fallback_value
+                    raise CircuitBreakerError(
+                        f"Service '{breaker.name}' is currently unavailable."
+                    )
+
+            try:
+                result = func(*args, **kwargs)
+                # Record success
+                breaker._failure_count = 0
+                if breaker._state == CircuitState.HALF_OPEN:
+                    breaker._state = CircuitState.CLOSED
+                return result
+            except breaker.expected_exceptions:
+                # Record failure
+                breaker._failure_count += 1
+                breaker._last_failure_time = time.time()
+                if breaker._state == CircuitState.HALF_OPEN:
+                    breaker._state = CircuitState.OPEN
+                elif breaker._failure_count >= breaker.failure_threshold:
+                    breaker._state = CircuitState.OPEN
+                    logger.warning(
+                        f"Circuit breaker '{breaker.name}' opened after "
+                        f"{breaker._failure_count} failures"
+                    )
+                raise
+        return wrapper
+    return decorator

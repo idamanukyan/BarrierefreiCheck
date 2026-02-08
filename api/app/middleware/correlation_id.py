@@ -84,18 +84,19 @@ class CorrelationIdFilter(logging.Filter):
         return True
 
 
-def setup_logging_with_correlation_id(level: int = logging.INFO) -> None:
+def setup_logging_with_correlation_id(
+    level: int = logging.INFO,
+    json_format: bool = False,
+) -> None:
     """
     Configure logging to include correlation IDs.
 
+    Args:
+        level: Logging level (default INFO)
+        json_format: If True, output logs in JSON format (for production)
+
     Call this during application startup.
     """
-    # Create formatter with correlation ID
-    formatter = logging.Formatter(
-        "%(asctime)s [%(correlation_id)s] %(levelname)s %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
@@ -104,13 +105,52 @@ def setup_logging_with_correlation_id(level: int = logging.INFO) -> None:
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Add new handler with correlation ID filter
+    # Create handler
     handler = logging.StreamHandler()
     handler.setLevel(level)
-    handler.setFormatter(formatter)
     handler.addFilter(CorrelationIdFilter())
+
+    if json_format:
+        # Use JSON formatter for production (structured logging)
+        try:
+            from pythonjsonlogger import jsonlogger
+
+            class CustomJsonFormatter(jsonlogger.JsonFormatter):
+                """Custom JSON formatter with additional fields."""
+
+                def add_fields(self, log_record, record, message_dict):
+                    super().add_fields(log_record, record, message_dict)
+                    log_record['timestamp'] = record.created
+                    log_record['level'] = record.levelname
+                    log_record['logger'] = record.name
+                    log_record['correlation_id'] = getattr(record, 'correlation_id', None)
+                    # Remove redundant fields
+                    log_record.pop('levelname', None)
+                    log_record.pop('name', None)
+
+            formatter = CustomJsonFormatter(
+                '%(timestamp)s %(level)s %(name)s %(message)s',
+                json_ensure_ascii=False,
+            )
+        except ImportError:
+            # Fallback to text format if python-json-logger not installed
+            logger.warning("python-json-logger not installed, using text format")
+            formatter = logging.Formatter(
+                "%(asctime)s [%(correlation_id)s] %(levelname)s %(name)s: %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S"
+            )
+    else:
+        # Text format for development (human-readable)
+        formatter = logging.Formatter(
+            "%(asctime)s [%(correlation_id)s] %(levelname)s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+
+    handler.setFormatter(formatter)
     root_logger.addHandler(handler)
 
     # Reduce noise from third-party libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)

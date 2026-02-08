@@ -2,6 +2,7 @@
 Job Queue Service
 
 BullMQ-compatible job queue for scan processing.
+Includes circuit breaker protection for Redis failures.
 """
 
 import json
@@ -12,6 +13,7 @@ from uuid import UUID
 
 import redis
 from app.config import settings
+from app.services.resilience import redis_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +50,14 @@ def add_scan_job(
 
     This function creates a job in the format expected by BullMQ.
     BullMQ stores jobs as Redis hashes and uses sorted sets for job ordering.
+
+    Uses circuit breaker to prevent cascading failures if Redis is down.
     """
+    # Check circuit breaker state
+    if redis_circuit_breaker.state.value == "open":
+        logger.error("Redis circuit breaker is open, cannot queue scan job")
+        return False
+
     try:
         r = get_redis_client()
         job_id = str(scan_id)
@@ -116,6 +125,12 @@ def add_scan_job(
 
     except redis.RedisError as e:
         logger.error(f"Failed to queue scan job {scan_id}: {e}")
+        # Record failure for circuit breaker
+        redis_circuit_breaker._failure_count += 1
+        if redis_circuit_breaker._failure_count >= redis_circuit_breaker.failure_threshold:
+            redis_circuit_breaker._state = redis_circuit_breaker._state.__class__("open")
+            redis_circuit_breaker._last_failure_time = time.time()
+            logger.warning("Redis circuit breaker opened due to queue failures")
         return False
     except Exception as e:
         logger.error(f"Unexpected error queuing scan job {scan_id}: {e}")

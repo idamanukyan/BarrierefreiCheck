@@ -9,6 +9,25 @@ import { logger } from './logger.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
+// UUID v4 regex pattern for validation
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Validate that a scanId is a valid UUID to prevent path traversal attacks
+ */
+function validateScanId(scanId: string): boolean {
+  return UUID_REGEX.test(scanId);
+}
+
+/**
+ * Sanitize a string for use in filenames
+ * Removes any characters that could be used for path traversal
+ */
+function sanitizeForFilename(input: string): string {
+  // Remove any path separators and special characters
+  return input.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+}
+
 export interface ScreenshotOptions {
   outputDir: string;
   fullPage?: boolean;
@@ -43,7 +62,29 @@ async function ensureDir(dir: string): Promise<void> {
 }
 
 /**
+ * Build a safe screenshot directory path for a scan
+ * Validates scanId and returns an absolute path within the allowed directory
+ */
+export function getSafeScreenshotDir(baseDir: string, scanId: string): string {
+  if (!validateScanId(scanId)) {
+    throw new Error(`Invalid scanId format: ${scanId}`);
+  }
+
+  // Use path.resolve to get absolute path and ensure it's within baseDir
+  const safePath = path.resolve(baseDir, scanId);
+
+  // Verify the resolved path is still within the base directory
+  const resolvedBase = path.resolve(baseDir);
+  if (!safePath.startsWith(resolvedBase)) {
+    throw new Error('Path traversal attempt detected');
+  }
+
+  return safePath;
+}
+
+/**
  * Generate a unique filename for screenshot
+ * Validates scanId and sanitizes ruleId to prevent path traversal
  */
 function generateFilename(
   scanId: string,
@@ -51,8 +92,16 @@ function generateFilename(
   index: number,
   type: string
 ): string {
+  // Validate scanId is a valid UUID
+  if (!validateScanId(scanId)) {
+    throw new Error(`Invalid scanId format: ${scanId}`);
+  }
+
+  // Sanitize ruleId to prevent any path traversal
+  const safeRuleId = sanitizeForFilename(ruleId);
   const timestamp = Date.now();
-  return `${scanId}_${ruleId}_${index}_${timestamp}.${type}`;
+
+  return `${scanId}_${safeRuleId}_${index}_${timestamp}.${type}`;
 }
 
 /**
@@ -67,6 +116,15 @@ export async function captureElementScreenshot(
   options: Partial<ScreenshotOptions> = {}
 ): Promise<ElementScreenshotResult> {
   const config = { ...DEFAULT_OPTIONS, ...options };
+
+  // Validate scanId to prevent path traversal attacks
+  if (!validateScanId(scanId)) {
+    logger.error(`Invalid scanId format rejected: ${scanId}`);
+    return {
+      success: false,
+      error: 'Invalid scanId format',
+    };
+  }
 
   try {
     await ensureDir(config.outputDir);
@@ -150,6 +208,15 @@ export async function captureFullPageScreenshot(
   options: Partial<ScreenshotOptions> = {}
 ): Promise<ElementScreenshotResult> {
   const config = { ...DEFAULT_OPTIONS, ...options };
+
+  // Validate scanId to prevent path traversal attacks
+  if (!validateScanId(scanId)) {
+    logger.error(`Invalid scanId format rejected: ${scanId}`);
+    return {
+      success: false,
+      error: 'Invalid scanId format',
+    };
+  }
 
   try {
     await ensureDir(config.outputDir);

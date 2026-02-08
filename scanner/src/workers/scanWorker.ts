@@ -12,7 +12,7 @@ import { logger } from '../utils/logger.js';
 import { validateUrl } from '../utils/url.js';
 import { Crawler, CrawlOptions } from '../crawler/crawler.js';
 import { AxeRunner, getAxeRunner } from '../axe/runner.js';
-import { captureHighlightedScreenshot } from '../utils/screenshot.js';
+import { captureHighlightedScreenshot, getSafeScreenshotDir } from '../utils/screenshot.js';
 import {
   SCAN_QUEUE,
   ScanJobData,
@@ -63,7 +63,8 @@ async function scanPage(
 
     // Capture screenshots for violations if enabled
     if (captureScreenshots && result.issues.length > 0) {
-      const screenshotDir = `./screenshots/${scanId}`;
+      // Use safe path builder to prevent path traversal
+      const screenshotDir = getSafeScreenshotDir('./screenshots', scanId);
 
       for (let i = 0; i < Math.min(result.issues.length, 20); i++) {
         const issue = result.issues[i];

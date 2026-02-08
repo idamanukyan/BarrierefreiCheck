@@ -46,8 +46,13 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     log_level = logging.DEBUG if settings.debug else logging.INFO
-    setup_logging_with_correlation_id(level=log_level)
-    logger.info("Starting AccessibilityChecker API...")
+    use_json_logging = settings.app_env == "production"
+    setup_logging_with_correlation_id(level=log_level, json_format=use_json_logging)
+    logger.info("Starting AccessibilityChecker API...", extra={
+        "environment": settings.app_env,
+        "debug": settings.debug,
+        "json_logging": use_json_logging,
+    })
     init_db()
     logger.info("Database initialized")
     yield

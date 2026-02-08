@@ -2,6 +2,7 @@
 Cache Service
 
 Redis-based caching for frequently accessed data.
+Includes circuit breaker protection for Redis failures.
 """
 
 import json
@@ -11,6 +12,7 @@ from functools import wraps
 
 import redis
 from app.config import settings
+from app.services.resilience import redis_circuit_breaker, CircuitBreakerError
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,17 @@ def get_redis_client() -> Optional[redis.Redis]:
 
 
 def cache_get(key: str) -> Optional[Any]:
-    """Get value from cache."""
+    """
+    Get value from cache.
+
+    Returns None if Redis is unavailable or circuit breaker is open.
+    This allows the application to gracefully degrade without caching.
+    """
+    # Check circuit breaker state
+    if redis_circuit_breaker.state.value == "open":
+        logger.debug("Redis circuit breaker open, skipping cache get")
+        return None
+
     client = get_redis_client()
     if client is None:
         return None
@@ -47,34 +59,69 @@ def cache_get(key: str) -> Optional[Any]:
         value = client.get(key)
         if value:
             return json.loads(value)
-    except (redis.RedisError, json.JSONDecodeError) as e:
+    except redis.RedisError as e:
         logger.warning(f"Cache get error for key {key}: {e}")
+        # Record failure for circuit breaker (simplified sync version)
+        redis_circuit_breaker._failure_count += 1
+        if redis_circuit_breaker._failure_count >= redis_circuit_breaker.failure_threshold:
+            redis_circuit_breaker._state = redis_circuit_breaker._state.__class__("open")
+            import time
+            redis_circuit_breaker._last_failure_time = time.time()
+            logger.warning("Redis circuit breaker opened due to repeated failures")
+    except json.JSONDecodeError as e:
+        logger.warning(f"Cache JSON decode error for key {key}: {e}")
     return None
 
 
 def cache_set(key: str, value: Any, ttl_seconds: int = 300) -> bool:
-    """Set value in cache with TTL."""
+    """
+    Set value in cache with TTL.
+
+    Returns False if Redis is unavailable or circuit breaker is open.
+    """
+    # Check circuit breaker state
+    if redis_circuit_breaker.state.value == "open":
+        logger.debug("Redis circuit breaker open, skipping cache set")
+        return False
+
     client = get_redis_client()
     if client is None:
         return False
     try:
         client.setex(key, ttl_seconds, json.dumps(value, default=str))
+        # Reset failure count on success
+        redis_circuit_breaker._failure_count = 0
         return True
     except (redis.RedisError, TypeError) as e:
         logger.warning(f"Cache set error for key {key}: {e}")
+        redis_circuit_breaker._failure_count += 1
+        if redis_circuit_breaker._failure_count >= redis_circuit_breaker.failure_threshold:
+            redis_circuit_breaker._state = redis_circuit_breaker._state.__class__("open")
+            import time
+            redis_circuit_breaker._last_failure_time = time.time()
     return False
 
 
 def cache_delete(key: str) -> bool:
-    """Delete value from cache."""
+    """
+    Delete value from cache.
+
+    Returns False if Redis is unavailable or circuit breaker is open.
+    """
+    # Check circuit breaker state
+    if redis_circuit_breaker.state.value == "open":
+        return False
+
     client = get_redis_client()
     if client is None:
         return False
     try:
         client.delete(key)
+        redis_circuit_breaker._failure_count = 0
         return True
     except redis.RedisError as e:
         logger.warning(f"Cache delete error for key {key}: {e}")
+        redis_circuit_breaker._failure_count += 1
     return False
 
 
