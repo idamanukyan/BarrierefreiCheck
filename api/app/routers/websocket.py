@@ -240,17 +240,42 @@ async def scan_websocket(
         await websocket.send_json({
             "type": "connected",
             "scan_id": scan_id,
-            "message": "Connected to scan updates"
+            "message": "Connected to scan updates",
+            "max_duration_seconds": settings.ws_max_connection_duration_seconds,
         })
+
+        # Track connection start time for max duration enforcement
+        import time
+        connection_start = time.time()
+        last_activity = time.time()
 
         # Keep connection alive and handle incoming messages
         while True:
+            # Check max connection duration
+            if time.time() - connection_start > settings.ws_max_connection_duration_seconds:
+                await websocket.send_json({
+                    "type": "connection_expired",
+                    "message": "Maximum connection duration reached. Please reconnect."
+                })
+                break
+
+            # Check idle timeout
+            if time.time() - last_activity > settings.ws_idle_timeout_seconds:
+                await websocket.send_json({
+                    "type": "idle_timeout",
+                    "message": "Connection closed due to inactivity."
+                })
+                break
+
             try:
-                # Wait for ping/pong or client messages
+                # Wait for ping/pong or client messages (configurable timeout)
                 data = await asyncio.wait_for(
                     websocket.receive_text(),
-                    timeout=30.0
+                    timeout=float(settings.ws_ping_interval_seconds)
                 )
+
+                # Update last activity time on any message
+                last_activity = time.time()
 
                 # Handle ping
                 if data == "ping":
@@ -302,15 +327,40 @@ async def notifications_websocket(
 
         await websocket.send_json({
             "type": "connected",
-            "message": "Connected to notifications"
+            "message": "Connected to notifications",
+            "max_duration_seconds": settings.ws_max_connection_duration_seconds,
         })
 
+        # Track connection start time for max duration enforcement
+        import time
+        connection_start = time.time()
+        last_activity = time.time()
+
         while True:
+            # Check max connection duration
+            if time.time() - connection_start > settings.ws_max_connection_duration_seconds:
+                await websocket.send_json({
+                    "type": "connection_expired",
+                    "message": "Maximum connection duration reached. Please reconnect."
+                })
+                break
+
+            # Check idle timeout
+            if time.time() - last_activity > settings.ws_idle_timeout_seconds:
+                await websocket.send_json({
+                    "type": "idle_timeout",
+                    "message": "Connection closed due to inactivity."
+                })
+                break
+
             try:
                 data = await asyncio.wait_for(
                     websocket.receive_text(),
-                    timeout=30.0
+                    timeout=float(settings.ws_ping_interval_seconds)
                 )
+
+                # Update last activity time on any message
+                last_activity = time.time()
 
                 if data == "ping":
                     await websocket.send_text("pong")

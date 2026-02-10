@@ -104,12 +104,22 @@ async def get_dashboard_stats(
         for scan in recent_scans_query
     ]
 
-    # Get issues by impact (aggregate from user's completed scans)
+    # Get issues by impact (aggregate from user's completed scans) - optimized single query
+    impact_sums = db.query(
+        func.coalesce(func.sum(Scan.issues_critical), 0).label('critical'),
+        func.coalesce(func.sum(Scan.issues_serious), 0).label('serious'),
+        func.coalesce(func.sum(Scan.issues_moderate), 0).label('moderate'),
+        func.coalesce(func.sum(Scan.issues_minor), 0).label('minor'),
+    ).filter(
+        Scan.user_id == current_user.id,
+        Scan.status == ScanStatus.COMPLETED,
+    ).first()
+
     issues_by_impact = {
-        "critical": user_scans.with_entities(func.sum(Scan.issues_critical)).scalar() or 0,
-        "serious": user_scans.with_entities(func.sum(Scan.issues_serious)).scalar() or 0,
-        "moderate": user_scans.with_entities(func.sum(Scan.issues_moderate)).scalar() or 0,
-        "minor": user_scans.with_entities(func.sum(Scan.issues_minor)).scalar() or 0,
+        "critical": int(impact_sums.critical) if impact_sums else 0,
+        "serious": int(impact_sums.serious) if impact_sums else 0,
+        "moderate": int(impact_sums.moderate) if impact_sums else 0,
+        "minor": int(impact_sums.minor) if impact_sums else 0,
     }
 
     # Issues by WCAG level (placeholder - would need to aggregate from issues table)

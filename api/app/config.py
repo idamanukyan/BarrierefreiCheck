@@ -39,6 +39,36 @@ class Settings(BaseSettings):
     s3_bucket_screenshots: str = "screenshots"
     s3_bucket_reports: str = "reports"
 
+    @field_validator("s3_access_key")
+    @classmethod
+    def validate_s3_access_key(cls, v: str, info) -> str:
+        import os
+
+        app_env = os.getenv("APP_ENV", "development").lower()
+        is_production = app_env in ("production", "prod", "staging")
+
+        if is_production and not v:
+            raise ValueError(
+                "S3_ACCESS_KEY must be set in production! "
+                "Set the S3_ACCESS_KEY environment variable."
+            )
+        return v
+
+    @field_validator("s3_secret_key")
+    @classmethod
+    def validate_s3_secret_key(cls, v: str, info) -> str:
+        import os
+
+        app_env = os.getenv("APP_ENV", "development").lower()
+        is_production = app_env in ("production", "prod", "staging")
+
+        if is_production and not v:
+            raise ValueError(
+                "S3_SECRET_KEY must be set in production! "
+                "Set the S3_SECRET_KEY environment variable."
+            )
+        return v
+
     # Stripe
     stripe_secret_key: Optional[str] = None
     stripe_webhook_secret: Optional[str] = None
@@ -81,12 +111,40 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     FROM_EMAIL: str = "noreply@barrierefrei-check.de"
     FROM_NAME: str = "BarrierefreiCheck"
+    EMAIL_ENABLED: bool = True  # Set to False to disable email sending
+
+    @field_validator("SMTP_USER")
+    @classmethod
+    def validate_smtp_config(cls, v: Optional[str], info) -> Optional[str]:
+        import os
+
+        app_env = os.getenv("APP_ENV", "development").lower()
+        is_production = app_env in ("production", "prod", "staging")
+        email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
+
+        if is_production and email_enabled:
+            smtp_host = os.getenv("SMTP_HOST", "localhost")
+            # Warn if using localhost SMTP in production with email enabled
+            if smtp_host == "localhost" and not v:
+                import warnings
+                warnings.warn(
+                    "SMTP is configured with localhost in production. "
+                    "Set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD for production email, "
+                    "or set EMAIL_ENABLED=false to disable email sending.",
+                    UserWarning,
+                )
+        return v
 
     # Scan Settings
     max_concurrent_scans: int = 10
     scan_timeout_seconds: int = 300
     default_crawl_limit: int = 100
     max_crawl_limit: int = 1000
+
+    # WebSocket Settings
+    ws_ping_interval_seconds: int = 30  # Send ping every 30 seconds
+    ws_max_connection_duration_seconds: int = 86400  # Max 24 hours per connection
+    ws_idle_timeout_seconds: int = 300  # Disconnect after 5 minutes of inactivity
 
     @field_validator("jwt_secret")
     @classmethod

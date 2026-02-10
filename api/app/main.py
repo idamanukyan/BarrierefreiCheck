@@ -97,12 +97,37 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # CORS Configuration
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",")]
 
+# Warn if using wildcard or localhost in production
+if settings.app_env == "production":
+    import logging
+    _logger = logging.getLogger(__name__)
+    if "*" in cors_origins:
+        _logger.warning("CORS configured with wildcard (*) in production - this is insecure!")
+    if any("localhost" in origin or "127.0.0.1" in origin for origin in cors_origins):
+        _logger.warning("CORS includes localhost in production - this may be unintended")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Restrict to only methods actually used by the API
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    # Explicitly list allowed headers instead of wildcard
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "X-Correlation-ID",
+    ],
+    # Expose headers that frontend may need to read
+    expose_headers=[
+        "X-Correlation-ID",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+    ],
 )
 
 # Correlation ID middleware for request tracing

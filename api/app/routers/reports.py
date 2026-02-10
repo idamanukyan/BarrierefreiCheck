@@ -7,25 +7,64 @@ API endpoints for generating and managing accessibility reports.
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from urllib.parse import urlparse
+import html
 import io
 
 from ..database import get_db
 from ..models import User, Scan, Report, ReportFormat as ReportFormatEnum
 from ..services.report_generator import ReportGenerator, ReportFormat
 from ..services.email_service import EmailService
+from ..services.rate_limiter import limiter
+from ..services.metrics import record_report_generated
 from .auth import get_current_user
+import time as time_module
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+
+# Rate limits for report operations
+REPORT_CREATE_LIMIT = "10/minute"  # Report generation is resource-intensive
+REPORT_DOWNLOAD_LIMIT = "30/minute"  # Downloads are less intensive
 
 
 # Pydantic schemas
 class BrandingConfig(BaseModel):
-    logo: Optional[str] = None
-    company_name: Optional[str] = None
+    logo: Optional[str] = Field(None, description="URL to company logo image")
+    company_name: Optional[str] = Field(None, max_length=200, description="Company name for branding")
+
+    @field_validator("logo")
+    @classmethod
+    def validate_logo_url(cls, v: Optional[str]) -> Optional[str]:
+        """Validate logo URL to prevent XSS and other attacks."""
+        if v is None:
+            return None
+        try:
+            parsed = urlparse(v)
+            # Must be a valid URL with scheme
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError("Invalid logo URL format")
+            # Only allow HTTPS URLs for logos (or data: for base64 images)
+            if parsed.scheme not in ("https", "data"):
+                raise ValueError("Logo URL must use HTTPS or be a data URI")
+            # Block dangerous patterns
+            if any(pattern in v.lower() for pattern in ["javascript:", "<script", "onerror", "onload"]):
+                raise ValueError("Logo URL contains potentially unsafe content")
+            return v
+        except Exception as e:
+            raise ValueError(f"Invalid logo URL: {e}")
+
+    @field_validator("company_name")
+    @classmethod
+    def sanitize_company_name(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize company name to prevent XSS."""
+        if v is None:
+            return None
+        # HTML escape the company name
+        return html.escape(v.strip())
 
 
 class ReportCreate(BaseModel):
@@ -74,6 +113,9 @@ async def generate_report_task(
     db: Session,
 ):
     """Background task to generate report."""
+    start_time = time_module.time()
+    format_str = format.value if hasattr(format, 'value') else str(format)
+
     try:
         # Generate report
         content = report_generator.generate(
@@ -92,6 +134,10 @@ async def generate_report_task(
             report.file_size = len(content)
             db.commit()
 
+        # Record success metrics
+        duration = time_module.time() - start_time
+        record_report_generated(format_str, language, duration, success=True)
+
     except Exception as e:
         # Mark report as failed
         report = db.query(Report).filter(Report.id == report_id).first()
@@ -100,9 +146,15 @@ async def generate_report_task(
             report.error = str(e)
             db.commit()
 
+        # Record failure metrics
+        duration = time_module.time() - start_time
+        record_report_generated(format_str, language, duration, success=False)
+
 
 @router.post("", response_model=ReportResponse, status_code=201)
+@limiter.limit(REPORT_CREATE_LIMIT)
 async def create_report(
+    request: Request,
     report_data: ReportCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -296,7 +348,9 @@ async def get_report(
 
 
 @router.get("/{report_id}/download")
+@limiter.limit(REPORT_DOWNLOAD_LIMIT)
 async def download_report(
+    request: Request,
     report_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

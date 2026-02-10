@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
 
@@ -16,8 +16,13 @@ from app.database import get_db
 from app.models import User, Scan, Page, Issue
 from app.routers.auth import get_current_user
 from app.services.export import get_export_service
+from app.services.rate_limiter import limiter
+from app.services.metrics import record_export_created
 
 router = APIRouter(prefix="/export", tags=["Export"])
+
+# Rate limits for export operations
+EXPORT_RATE_LIMIT = "20/minute"  # Exports can be resource-intensive
 
 
 class ExportFormat(str, Enum):
@@ -27,7 +32,9 @@ class ExportFormat(str, Enum):
 
 
 @router.get("/scans/{scan_id}/issues")
+@limiter.limit(EXPORT_RATE_LIMIT)
 async def export_scan_issues(
+    request: Request,
     scan_id: UUID,
     format: ExportFormat = Query(ExportFormat.CSV, description="Export format"),
     include_html: bool = Query(False, description="Include element HTML in export"),
@@ -86,6 +93,9 @@ async def export_scan_issues(
         filename = f"scan-{scan_id}-issues.json"
         media_type = "application/json"
 
+    # Record export metrics
+    record_export_created(format.value, "issues", len(content.encode('utf-8') if isinstance(content, str) else content))
+
     return Response(
         content=content,
         media_type=media_type,
@@ -96,7 +106,9 @@ async def export_scan_issues(
 
 
 @router.get("/scans/{scan_id}/summary")
+@limiter.limit(EXPORT_RATE_LIMIT)
 async def export_scan_summary(
+    request: Request,
     scan_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -136,6 +148,9 @@ async def export_scan_summary(
 
     filename = f"scan-{scan_id}-summary.json"
 
+    # Record export metrics
+    record_export_created("json", "summary", len(content.encode('utf-8') if isinstance(content, str) else content))
+
     return Response(
         content=content,
         media_type="application/json",
@@ -146,7 +161,9 @@ async def export_scan_summary(
 
 
 @router.get("/scans/{scan_id}/pages")
+@limiter.limit(EXPORT_RATE_LIMIT)
 async def export_scan_pages(
+    request: Request,
     scan_id: UUID,
     format: ExportFormat = Query(ExportFormat.CSV, description="Export format"),
     db: Session = Depends(get_db),
@@ -208,6 +225,9 @@ async def export_scan_pages(
         content = json.dumps(data, indent=2, ensure_ascii=False)
         filename = f"scan-{scan_id}-pages.json"
         media_type = "application/json"
+
+    # Record export metrics
+    record_export_created(format.value, "pages", len(content.encode('utf-8') if isinstance(content, str) else content))
 
     return Response(
         content=content,

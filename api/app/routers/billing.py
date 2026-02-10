@@ -9,7 +9,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, HttpUrl
+from urllib.parse import urlparse
+import re
 
 from ..database import get_db
 from ..models import User, Subscription, Payment, UsageRecord, PlanType, SubscriptionStatus, PaymentStatus
@@ -19,9 +21,15 @@ from .auth import get_current_user
 import stripe
 import logging
 
+from ..services.rate_limiter import limiter
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
+
+# Rate limits for billing operations
+CHECKOUT_RATE_LIMIT = "5/minute"  # Prevent checkout abuse
+SUBSCRIPTION_RATE_LIMIT = "10/minute"  # Subscription modifications
 
 
 # Pydantic schemas
@@ -83,8 +91,27 @@ class PaymentListResponse(BaseModel):
 
 class CreateCheckoutSession(BaseModel):
     plan: str = Field(..., description="Plan ID: starter, professional, enterprise")
-    success_url: str
-    cancel_url: str
+    success_url: str = Field(..., description="URL to redirect after successful payment")
+    cancel_url: str = Field(..., description="URL to redirect after cancelled payment")
+
+    @field_validator("success_url", "cancel_url")
+    @classmethod
+    def validate_redirect_url(cls, v: str) -> str:
+        """Validate redirect URLs to prevent open redirect attacks."""
+        try:
+            parsed = urlparse(v)
+            # Must have scheme and netloc
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError("Invalid URL format")
+            # Only allow HTTPS in production (HTTP allowed for localhost in dev)
+            if parsed.scheme not in ("https", "http"):
+                raise ValueError("URL must use HTTPS or HTTP scheme")
+            # Block known dangerous patterns
+            if any(char in v for char in ["<", ">", "'", '"', "javascript:", "data:"]):
+                raise ValueError("URL contains invalid characters")
+            return v
+        except Exception as e:
+            raise ValueError(f"Invalid redirect URL: {e}")
 
 
 class CheckoutSessionResponse(BaseModel):
@@ -338,7 +365,9 @@ async def get_usage(
 
 
 @router.post("/checkout", response_model=CheckoutSessionResponse)
+@limiter.limit(CHECKOUT_RATE_LIMIT)
 async def create_checkout_session(
+    request: Request,
     data: CreateCheckoutSession,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -459,12 +488,34 @@ async def get_payments(
     )
 
 
+# Track processed webhook events to prevent replay attacks
+_processed_webhook_events: set = set()
+_processed_events_max_size = 10000  # Limit memory usage
+
+
+def _is_event_processed(event_id: str) -> bool:
+    """Check if an event has already been processed."""
+    return event_id in _processed_webhook_events
+
+
+def _mark_event_processed(event_id: str) -> None:
+    """Mark an event as processed."""
+    # Limit set size to prevent memory issues
+    if len(_processed_webhook_events) >= _processed_events_max_size:
+        # Remove oldest entries (first 1000)
+        items_to_remove = list(_processed_webhook_events)[:1000]
+        for item in items_to_remove:
+            _processed_webhook_events.discard(item)
+    _processed_webhook_events.add(event_id)
+
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Handle Stripe webhooks with proper signature verification.
 
     This endpoint receives events from Stripe and updates subscription status accordingly.
+    Includes replay attack protection via event ID tracking.
     """
     payload = await request.body()
     sig_header = request.headers.get("Stripe-Signature")
@@ -480,6 +531,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Missing signature header")
 
     try:
+        # Stripe SDK validates signature AND timestamp (within 5 minute tolerance by default)
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.stripe_webhook_secret
         )
@@ -490,11 +542,21 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         logger.warning(f"Invalid webhook signature: {e}")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
+    # Check for replay attack - prevent duplicate event processing
+    event_id = event.get("id")
+    if not event_id:
+        logger.warning("Webhook event missing ID")
+        raise HTTPException(status_code=400, detail="Invalid event: missing ID")
+
+    if _is_event_processed(event_id):
+        logger.info(f"Ignoring duplicate webhook event: {event_id}")
+        return {"status": "already_processed", "event_id": event_id}
+
     # Handle the event
     event_type = event["type"]
     event_data = event["data"]["object"]
 
-    logger.info(f"Processing Stripe webhook event: {event_type}")
+    logger.info(f"Processing Stripe webhook event: {event_type} (id: {event_id})")
 
     try:
         if event_type == "customer.subscription.created":
@@ -513,7 +575,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         logger.error(f"Error processing webhook event {event_type}: {e}")
         raise HTTPException(status_code=500, detail="Error processing webhook")
 
-    return {"status": "received", "event_type": event_type}
+    # Mark event as processed to prevent replays
+    _mark_event_processed(event_id)
+
+    return {"status": "received", "event_type": event_type, "event_id": event_id}
 
 
 async def _handle_subscription_created(db: Session, subscription_data: dict):

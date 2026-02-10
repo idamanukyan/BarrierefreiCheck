@@ -117,6 +117,61 @@ CACHE_MISSES = Counter(
     ["cache_type"]
 )
 
+# Report metrics
+REPORTS_GENERATED = Counter(
+    "reports_generated_total",
+    "Total reports generated",
+    ["format", "language", "status"]  # status: success/failure
+)
+
+REPORT_GENERATION_DURATION = Histogram(
+    "report_generation_duration_seconds",
+    "Report generation duration in seconds",
+    ["format"],
+    buckets=[0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0]
+)
+
+# Export metrics
+EXPORTS_CREATED = Counter(
+    "exports_created_total",
+    "Total exports created",
+    ["format", "type"]  # type: issues/summary/pages
+)
+
+EXPORT_SIZE_BYTES = Histogram(
+    "export_size_bytes",
+    "Export file size in bytes",
+    ["format"],
+    buckets=[1024, 10240, 102400, 1048576, 10485760]  # 1KB, 10KB, 100KB, 1MB, 10MB
+)
+
+# Email metrics
+EMAILS_SENT = Counter(
+    "emails_sent_total",
+    "Total emails sent",
+    ["type", "status"]  # type: welcome/report/password_reset, status: success/failure
+)
+
+EMAIL_SEND_DURATION = Histogram(
+    "email_send_duration_seconds",
+    "Email send duration in seconds",
+    ["type"],
+    buckets=[0.1, 0.5, 1.0, 2.5, 5.0, 10.0]
+)
+
+# WebSocket metrics
+WEBSOCKET_CONNECTIONS = Gauge(
+    "websocket_connections_active",
+    "Number of active WebSocket connections",
+    ["type"]  # type: scan/notifications
+)
+
+WEBSOCKET_MESSAGES = Counter(
+    "websocket_messages_total",
+    "Total WebSocket messages sent",
+    ["type", "message_type"]  # type: scan/notifications, message_type: progress/completed/failed
+)
+
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Middleware to collect HTTP request metrics."""
@@ -231,3 +286,41 @@ def record_cache_access(cache_type: str, hit: bool):
         CACHE_HITS.labels(cache_type=cache_type).inc()
     else:
         CACHE_MISSES.labels(cache_type=cache_type).inc()
+
+
+def record_report_generated(format: str, language: str, duration_seconds: float, success: bool = True):
+    """Record report generation metrics."""
+    status = "success" if success else "failure"
+    REPORTS_GENERATED.labels(format=format, language=language, status=status).inc()
+    if success:
+        REPORT_GENERATION_DURATION.labels(format=format).observe(duration_seconds)
+
+
+def record_export_created(format: str, export_type: str, size_bytes: int = 0):
+    """Record export creation metrics."""
+    EXPORTS_CREATED.labels(format=format, type=export_type).inc()
+    if size_bytes > 0:
+        EXPORT_SIZE_BYTES.labels(format=format).observe(size_bytes)
+
+
+def record_email_sent(email_type: str, duration_seconds: float, success: bool = True):
+    """Record email send metrics."""
+    status = "success" if success else "failure"
+    EMAILS_SENT.labels(type=email_type, status=status).inc()
+    if success:
+        EMAIL_SEND_DURATION.labels(type=email_type).observe(duration_seconds)
+
+
+def record_websocket_connect(ws_type: str):
+    """Record WebSocket connection."""
+    WEBSOCKET_CONNECTIONS.labels(type=ws_type).inc()
+
+
+def record_websocket_disconnect(ws_type: str):
+    """Record WebSocket disconnection."""
+    WEBSOCKET_CONNECTIONS.labels(type=ws_type).dec()
+
+
+def record_websocket_message(ws_type: str, message_type: str):
+    """Record WebSocket message sent."""
+    WEBSOCKET_MESSAGES.labels(type=ws_type, message_type=message_type).inc()
