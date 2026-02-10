@@ -7,13 +7,16 @@ Real-time updates for scan progress and notifications.
 import asyncio
 import json
 import logging
-from typing import Dict, Set
+from typing import Dict, Optional, Set, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from jose import JWTError, jwt
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import get_db
+from app.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +149,12 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-def verify_ws_token(token: str) -> str:
-    """Verify JWT token and return user email."""
+def verify_ws_token(token: str) -> Optional[Tuple[str, str]]:
+    """
+    Verify JWT token and return (user_id, email) tuple.
+
+    Returns None if token is invalid.
+    """
     try:
         payload = jwt.decode(
             token,
@@ -155,11 +162,45 @@ def verify_ws_token(token: str) -> str:
             algorithms=[settings.jwt_algorithm]
         )
         email = payload.get("sub")
+        user_id = payload.get("user_id")
+
         if email is None:
             return None
-        return email
+
+        # If user_id is in the token, use it directly
+        if user_id:
+            return (user_id, email)
+
+        # Otherwise, return email as identifier (backwards compatibility)
+        # In production, the token should always include user_id
+        return (email, email)
     except JWTError:
         return None
+
+
+def get_user_id_from_token(token: str, db: Session) -> Optional[str]:
+    """
+    Get user ID from token, looking up by email if needed.
+
+    This ensures we always use user ID for WebSocket identification,
+    even with older tokens that only have email.
+    """
+    token_data = verify_ws_token(token)
+    if not token_data:
+        return None
+
+    user_id, email = token_data
+
+    # If we got a proper user_id from the token, use it
+    if user_id and user_id != email:
+        return user_id
+
+    # Otherwise, look up the user by email to get their ID
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return None
+
+    return str(user.id)
 
 
 @router.websocket("/ws/scans/{scan_id}")
@@ -178,14 +219,22 @@ async def scan_websocket(
     - scan_completed: {"type": "scan_completed", "score": 85.5, "issues_count": 10}
     - scan_failed: {"type": "scan_failed", "error": "..."}
     """
-    # Verify token
-    user_email = verify_ws_token(token)
-    if not user_email:
+    # Import here to avoid circular imports
+    from app.database import SessionLocal
+
+    # Verify token and get user ID
+    db = SessionLocal()
+    try:
+        user_id = get_user_id_from_token(token, db)
+    finally:
+        db.close()
+
+    if not user_id:
         await websocket.close(code=4001, reason="Invalid or expired token")
         return
 
     try:
-        await manager.connect(websocket, user_email, scan_id)
+        await manager.connect(websocket, user_id, scan_id)
 
         # Send initial connection confirmation
         await websocket.send_json({
@@ -234,14 +283,22 @@ async def notifications_websocket(
 
     Receives all scan updates for the authenticated user.
     """
-    # Verify token
-    user_email = verify_ws_token(token)
-    if not user_email:
+    # Import here to avoid circular imports
+    from app.database import SessionLocal
+
+    # Verify token and get user ID
+    db = SessionLocal()
+    try:
+        user_id = get_user_id_from_token(token, db)
+    finally:
+        db.close()
+
+    if not user_id:
         await websocket.close(code=4001, reason="Invalid or expired token")
         return
 
     try:
-        await manager.connect(websocket, user_email)
+        await manager.connect(websocket, user_id)
 
         await websocket.send_json({
             "type": "connected",

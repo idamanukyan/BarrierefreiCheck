@@ -5,7 +5,12 @@ Models for subscriptions, payments, and usage tracking.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def utc_now():
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 from sqlalchemy import (
     Column,
     String,
@@ -72,8 +77,8 @@ class Subscription(Base):
     trial_end = Column(DateTime, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     canceled_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -160,7 +165,7 @@ class Payment(Base):
     description = Column(String(255), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     paid_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -194,8 +199,8 @@ class UsageRecord(Base):
     api_calls = Column(Integer, default=0)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     def __repr__(self):
         return f"<UsageRecord {self.user_id} - {self.period_start}>"
@@ -225,7 +230,7 @@ class Report(Base):
     file_size = Column(Integer, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     expires_at = Column(DateTime, nullable=True)
 
     # Relationships

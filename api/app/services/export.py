@@ -7,7 +7,7 @@ Export scan data to various formats (CSV, JSON).
 import csv
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.models import Scan, Page, Issue, ImpactLevel
@@ -87,7 +87,7 @@ class ExportService:
             JSON string
         """
         data = {
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
             "total_issues": len(issues),
             "issues": []
         }
@@ -152,7 +152,7 @@ class ExportService:
                 wcag_counts[criteria] = wcag_counts.get(criteria, 0) + 1
 
         data = {
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
             "scan": {
                 "id": str(scan.id),
                 "url": scan.url,

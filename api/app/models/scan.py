@@ -5,7 +5,12 @@ Defines the Scan, Page, and Issue tables for accessibility testing.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def utc_now():
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 from sqlalchemy import (
     Column,
     String,
@@ -87,7 +92,7 @@ class Scan(Base):
     issues_minor = Column(Integer, default=0)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=utc_now, index=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
@@ -160,7 +165,7 @@ class Page(Base):
 
     # Status
     error = Column(Text, nullable=True)
-    scanned_at = Column(DateTime, default=datetime.utcnow)
+    scanned_at = Column(DateTime, default=utc_now)
 
     # Relationships
     scan = relationship("Scan", back_populates="pages")
@@ -202,7 +207,7 @@ class Issue(Base):
     screenshot_path = Column(String(512), nullable=True)
 
     # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     # Relationships
     page = relationship("Page", back_populates="issues")

@@ -186,8 +186,8 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     db.commit()
     db.refresh(user)
 
-    # Create access token
-    access_token = create_access_token(data={"sub": user.email})
+    # Create access token with user_id for secure WebSocket connections
+    access_token = create_access_token(data={"sub": user.email, "user_id": str(user.id)})
 
     return AuthResponse(
         user=UserResponse(
@@ -226,8 +226,8 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
 
-    # Create access token
-    access_token = create_access_token(data={"sub": user.email})
+    # Create access token with user_id for secure WebSocket connections
+    access_token = create_access_token(data={"sub": user.email, "user_id": str(user.id)})
 
     return AuthResponse(
         user=UserResponse(
@@ -289,9 +289,9 @@ async def refresh_token(request: Request, refresh_data: RefreshRequest, db: Sess
             detail="User not found"
         )
 
-    # Create new tokens
-    access_token = create_access_token(data={"sub": user.email})
-    new_refresh_token = create_refresh_token(data={"sub": user.email})
+    # Create new tokens with user_id for secure WebSocket connections
+    access_token = create_access_token(data={"sub": user.email, "user_id": str(user.id)})
+    new_refresh_token = create_refresh_token(data={"sub": user.email, "user_id": str(user.id)})
 
     return Token(access_token=access_token, refresh_token=new_refresh_token)
 

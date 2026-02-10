@@ -42,9 +42,34 @@ class Settings(BaseSettings):
     # Stripe
     stripe_secret_key: Optional[str] = None
     stripe_webhook_secret: Optional[str] = None
+    stripe_publishable_key: Optional[str] = None
+
+    @field_validator("stripe_webhook_secret")
+    @classmethod
+    def validate_stripe_webhook_secret(cls, v: Optional[str], info) -> Optional[str]:
+        import os
+
+        app_env = os.getenv("APP_ENV", "development").lower()
+        is_production = app_env in ("production", "prod", "staging")
+        stripe_key = os.getenv("STRIPE_SECRET_KEY")
+
+        # Only require webhook secret if Stripe is configured
+        if is_production and stripe_key and not v:
+            import warnings
+            warnings.warn(
+                "STRIPE_WEBHOOK_SECRET is not set but STRIPE_SECRET_KEY is configured. "
+                "Webhook signature verification will fail.",
+                UserWarning,
+            )
+        return v
 
     # CORS
     cors_origins: str = "http://localhost:3000"
+
+    # Trusted Proxies (CIDR notation, comma-separated)
+    # Only trust X-Forwarded-For from these networks
+    # Example: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    trusted_proxies: str = ""
 
     # Frontend URL
     FRONTEND_URL: str = "http://localhost:3000"
@@ -66,17 +91,29 @@ class Settings(BaseSettings):
     @field_validator("jwt_secret")
     @classmethod
     def validate_jwt_secret(cls, v: str, info) -> str:
+        import os
+
+        app_env = os.getenv("APP_ENV", "development").lower()
+        is_production = app_env in ("production", "prod", "staging")
+
         if not v or v == "":
-            # In development, generate a warning but allow startup
+            if is_production:
+                raise ValueError(
+                    "JWT_SECRET must be set in production! "
+                    "Set the JWT_SECRET environment variable with a secure, random value "
+                    "of at least 32 characters."
+                )
+            # In development only, generate a random secret with a warning
             import warnings
+            import secrets
             warnings.warn(
-                "JWT_SECRET is not set! This is a critical security risk. "
-                "Set JWT_SECRET environment variable before deploying to production.",
+                "JWT_SECRET is not set! Generating a random secret for development. "
+                "This means sessions will be invalidated on restart. "
+                "Set JWT_SECRET environment variable to persist sessions.",
                 UserWarning,
             )
-            # Return a random secret for development only
-            import secrets
             return secrets.token_urlsafe(32)
+
         if len(v) < 32:
             raise ValueError("JWT_SECRET must be at least 32 characters long")
         return v

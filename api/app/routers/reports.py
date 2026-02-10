@@ -5,7 +5,7 @@ API endpoints for generating and managing accessibility reports.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse
@@ -216,7 +216,7 @@ async def create_report(
         format=report_data.format,
         language=report_data.language,
         status="generating",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
 
 

@@ -10,7 +10,7 @@ import hmac
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from enum import Enum
 
@@ -37,7 +37,7 @@ class WebhookPayload:
     def __init__(self, event: WebhookEvent, data: Dict[str, Any]):
         self.event = event
         self.data = data
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = datetime.now(timezone.utc).isoformat()
         self.id = self._generate_id()
 
     def _generate_id(self) -> str:
@@ -208,7 +208,7 @@ async def notify_scan_started(
             "scan_id": scan_id,
             "url": url,
             "user_id": user_id,
-            "started_at": datetime.utcnow().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat(),
         }
     )
 
@@ -234,7 +234,7 @@ async def notify_scan_completed(
             "issues_count": issues_count,
             "pages_scanned": pages_scanned,
             "duration_seconds": duration_seconds,
-            "completed_at": datetime.utcnow().isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
         }
     )
 
@@ -254,7 +254,7 @@ async def notify_scan_failed(
             "scan_id": scan_id,
             "url": url,
             "error": error,
-            "failed_at": datetime.utcnow().isoformat(),
+            "failed_at": datetime.now(timezone.utc).isoformat(),
         }
     )
 

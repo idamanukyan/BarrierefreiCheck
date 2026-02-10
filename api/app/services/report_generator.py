@@ -7,7 +7,7 @@ Generates accessibility scan reports in PDF, HTML, JSON, and CSV formats.
 import json
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
@@ -111,7 +111,7 @@ class ReportGenerator:
     def _generate_json(self, scan_data: dict) -> bytes:
         """Generate JSON report."""
         report = {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "generator": "BarrierefreiCheck",
             "version": "1.0.0",
             "scan": scan_data,
@@ -199,7 +199,7 @@ class ReportGenerator:
             include_screenshots=include_screenshots,
             branding=branding or {},
             standalone=standalone,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
         )
 
     def _get_translations(self, language: str) -> dict:

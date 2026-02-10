@@ -203,8 +203,8 @@ async def export_scan_pages(
                 for page in pages
             ]
         }
-        from datetime import datetime
-        data["exported_at"] = datetime.utcnow().isoformat()
+        from datetime import datetime, timezone
+        data["exported_at"] = datetime.now(timezone.utc).isoformat()
         content = json.dumps(data, indent=2, ensure_ascii=False)
         filename = f"scan-{scan_id}-pages.json"
         media_type = "application/json"
