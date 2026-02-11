@@ -7,6 +7,8 @@ Real-time updates for scan progress and notifications.
 import asyncio
 import json
 import logging
+import time
+from datetime import datetime, timezone
 from typing import Dict, Optional, Set, Tuple
 from uuid import UUID
 
@@ -17,8 +19,12 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import User
+from app.services.cache import is_token_blacklisted
 
 logger = logging.getLogger(__name__)
+
+# How often to re-validate tokens during active connections (seconds)
+TOKEN_REVALIDATION_INTERVAL = 60
 
 router = APIRouter()
 
@@ -149,18 +155,38 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-def verify_ws_token(token: str) -> Optional[Tuple[str, str]]:
+def verify_ws_token(token: str, check_blacklist: bool = True) -> Optional[Tuple[str, str]]:
     """
     Verify JWT token and return (user_id, email) tuple.
 
-    Returns None if token is invalid.
+    Args:
+        token: The JWT token to verify
+        check_blacklist: Whether to check if token is blacklisted (default True)
+
+    Returns None if token is invalid, expired, or blacklisted.
     """
     try:
+        # Check if token is blacklisted (logged out)
+        if check_blacklist and is_token_blacklisted(token):
+            logger.debug("WebSocket token is blacklisted")
+            return None
+
+        # Decode and verify token (jose automatically checks expiry)
         payload = jwt.decode(
             token,
             settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm]
+            algorithms=[settings.jwt_algorithm],
+            options={"require_exp": True}  # Explicitly require expiration claim
         )
+
+        # Check expiration explicitly for clarity
+        exp = payload.get("exp")
+        if exp is not None:
+            exp_datetime = datetime.fromtimestamp(exp, tz=timezone.utc)
+            if datetime.now(timezone.utc) >= exp_datetime:
+                logger.debug("WebSocket token has expired")
+                return None
+
         email = payload.get("sub")
         user_id = payload.get("user_id")
 
@@ -174,8 +200,18 @@ def verify_ws_token(token: str) -> Optional[Tuple[str, str]]:
         # Otherwise, return email as identifier (backwards compatibility)
         # In production, the token should always include user_id
         return (email, email)
-    except JWTError:
+    except JWTError as e:
+        logger.debug(f"WebSocket token verification failed: {e}")
         return None
+
+
+def is_token_still_valid(token: str) -> bool:
+    """
+    Quick check if a token is still valid during an active WebSocket connection.
+
+    This is called periodically to ensure revoked tokens don't stay connected.
+    """
+    return verify_ws_token(token, check_blacklist=True) is not None
 
 
 def get_user_id_from_token(token: str, db: Session) -> Optional[str]:
@@ -244,15 +280,17 @@ async def scan_websocket(
             "max_duration_seconds": settings.ws_max_connection_duration_seconds,
         })
 
-        # Track connection start time for max duration enforcement
-        import time
+        # Track connection timing
         connection_start = time.time()
         last_activity = time.time()
+        last_token_check = time.time()
 
         # Keep connection alive and handle incoming messages
         while True:
+            current_time = time.time()
+
             # Check max connection duration
-            if time.time() - connection_start > settings.ws_max_connection_duration_seconds:
+            if current_time - connection_start > settings.ws_max_connection_duration_seconds:
                 await websocket.send_json({
                     "type": "connection_expired",
                     "message": "Maximum connection duration reached. Please reconnect."
@@ -260,12 +298,23 @@ async def scan_websocket(
                 break
 
             # Check idle timeout
-            if time.time() - last_activity > settings.ws_idle_timeout_seconds:
+            if current_time - last_activity > settings.ws_idle_timeout_seconds:
                 await websocket.send_json({
                     "type": "idle_timeout",
                     "message": "Connection closed due to inactivity."
                 })
                 break
+
+            # Periodically revalidate token to catch revocations
+            if current_time - last_token_check > TOKEN_REVALIDATION_INTERVAL:
+                if not is_token_still_valid(token):
+                    logger.info(f"WebSocket token revoked during connection: user={user_id}")
+                    await websocket.send_json({
+                        "type": "token_revoked",
+                        "message": "Your session has been revoked. Please log in again."
+                    })
+                    break
+                last_token_check = current_time
 
             try:
                 # Wait for ping/pong or client messages (configurable timeout)
@@ -331,14 +380,16 @@ async def notifications_websocket(
             "max_duration_seconds": settings.ws_max_connection_duration_seconds,
         })
 
-        # Track connection start time for max duration enforcement
-        import time
+        # Track connection timing
         connection_start = time.time()
         last_activity = time.time()
+        last_token_check = time.time()
 
         while True:
+            current_time = time.time()
+
             # Check max connection duration
-            if time.time() - connection_start > settings.ws_max_connection_duration_seconds:
+            if current_time - connection_start > settings.ws_max_connection_duration_seconds:
                 await websocket.send_json({
                     "type": "connection_expired",
                     "message": "Maximum connection duration reached. Please reconnect."
@@ -346,12 +397,23 @@ async def notifications_websocket(
                 break
 
             # Check idle timeout
-            if time.time() - last_activity > settings.ws_idle_timeout_seconds:
+            if current_time - last_activity > settings.ws_idle_timeout_seconds:
                 await websocket.send_json({
                     "type": "idle_timeout",
                     "message": "Connection closed due to inactivity."
                 })
                 break
+
+            # Periodically revalidate token to catch revocations
+            if current_time - last_token_check > TOKEN_REVALIDATION_INTERVAL:
+                if not is_token_still_valid(token):
+                    logger.info(f"WebSocket token revoked during connection: user={user_id}")
+                    await websocket.send_json({
+                        "type": "token_revoked",
+                        "message": "Your session has been revoked. Please log in again."
+                    })
+                    break
+                last_token_check = current_time
 
             try:
                 data = await asyncio.wait_for(

@@ -176,15 +176,36 @@ def blacklist_token(token: str, ttl_seconds: int) -> bool:
     return False
 
 
-def is_token_blacklisted(token: str) -> bool:
-    """Check if a token has been blacklisted (logged out)."""
+def is_token_blacklisted(token: str, fail_closed: bool = True) -> bool:
+    """
+    Check if a token has been blacklisted (logged out).
+
+    Security: By default, fails closed (returns True) when Redis is unavailable.
+    This prevents revoked tokens from being used during Redis outages.
+    Set fail_closed=False only for non-security-critical checks.
+
+    Args:
+        token: The JWT token to check
+        fail_closed: If True (default), returns True when Redis unavailable
+                    to err on the side of security
+
+    Returns:
+        True if token is blacklisted or cannot be verified (when fail_closed=True)
+        False if token is not blacklisted
+    """
     client = get_redis_client()
     if client is None:
-        return False  # Fail open if Redis unavailable (could also fail closed)
+        if fail_closed:
+            logger.warning("Redis unavailable - failing closed for token blacklist check")
+            return True  # Fail closed: assume token is blacklisted for security
+        return False
     try:
         return client.exists(f"token_blacklist:{token}") > 0
     except redis.RedisError as e:
         logger.warning(f"Failed to check token blacklist: {e}")
+        if fail_closed:
+            logger.warning("Redis error - failing closed for token blacklist check")
+            return True  # Fail closed: assume token is blacklisted for security
     return False
 
 

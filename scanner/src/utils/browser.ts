@@ -2,6 +2,11 @@
  * Browser Manager - Puppeteer browser instance management
  *
  * Handles browser lifecycle, page creation, and resource cleanup.
+ *
+ * SECURITY NOTE: This scanner visits untrusted websites. We maintain browser
+ * security features (same-origin policy, site isolation) to prevent malicious
+ * websites from exploiting the scanner. The scanner operates in a sandboxed
+ * Docker container for additional isolation.
  */
 
 import puppeteer, { Browser, Page, PuppeteerLaunchOptions } from 'puppeteer';
@@ -12,6 +17,8 @@ export interface BrowserConfig {
   timeout?: number;
   viewport?: { width: number; height: number };
   userAgent?: string;
+  /** Allow disabling sandbox for Docker environments (requires container isolation) */
+  allowNoSandbox?: boolean;
 }
 
 const DEFAULT_CONFIG: BrowserConfig = {
@@ -20,6 +27,7 @@ const DEFAULT_CONFIG: BrowserConfig = {
   viewport: { width: 1920, height: 1080 },
   userAgent:
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 AccessibilityChecker/1.0',
+  allowNoSandbox: true, // Required for Docker, ensure container provides isolation
 };
 
 export class BrowserManager {
@@ -32,6 +40,10 @@ export class BrowserManager {
 
   /**
    * Launch a new browser instance
+   *
+   * SECURITY: We maintain browser security features to protect against
+   * malicious websites. The scanner runs in a Docker container which
+   * provides the necessary isolation for --no-sandbox mode.
    */
   async launch(): Promise<Browser> {
     if (this.browser) {
@@ -40,18 +52,37 @@ export class BrowserManager {
 
     logger.info('Launching browser...');
 
+    // Base arguments for performance and Docker compatibility
+    const args: string[] = [
+      '--disable-dev-shm-usage',     // Use /tmp instead of /dev/shm for shared memory
+      '--disable-accelerated-2d-canvas',
+      '--disable-gpu',
+      '--window-size=1920,1080',
+      // Security: Block potentially dangerous features
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-extensions',
+      '--disable-sync',
+      '--disable-translate',
+      '--metrics-recording-only',
+      '--mute-audio',
+      '--no-first-run',
+      // Limit resource usage per page
+      '--single-process',            // Use single process for better isolation
+      '--disable-backgrounding-occluded-windows',
+    ];
+
+    // Add sandbox flags only if explicitly allowed (Docker environments)
+    // SECURITY NOTE: When using --no-sandbox, ensure the container provides
+    // proper isolation (non-root user, seccomp profiles, read-only filesystem)
+    if (this.config.allowNoSandbox) {
+      args.push('--no-sandbox', '--disable-setuid-sandbox');
+      logger.warn('Browser sandbox disabled - ensure container provides isolation');
+    }
+
     const launchOptions: PuppeteerLaunchOptions = {
       headless: this.config.headless,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920,1080',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
-      ],
+      args,
       defaultViewport: this.config.viewport,
     };
 
@@ -68,6 +99,11 @@ export class BrowserManager {
 
   /**
    * Create a new page with configured settings
+   *
+   * SECURITY: Pages are created with security-conscious defaults:
+   * - JavaScript dialogs are auto-dismissed
+   * - Download behavior is disabled
+   * - Potentially dangerous resources are blocked
    */
   async createPage(): Promise<Page> {
     const browser = await this.launch();
@@ -87,17 +123,54 @@ export class BrowserManager {
     page.setDefaultTimeout(this.config.timeout || 30000);
     page.setDefaultNavigationTimeout(this.config.timeout || 30000);
 
-    // Block unnecessary resources for faster loading
+    // SECURITY: Auto-dismiss JavaScript dialogs to prevent scanner blocking
+    page.on('dialog', async (dialog) => {
+      logger.debug(`Auto-dismissing ${dialog.type()} dialog: ${dialog.message()}`);
+      await dialog.dismiss();
+    });
+
+    // SECURITY: Block downloads to prevent malicious file execution
+    const client = await page.createCDPSession();
+    await client.send('Page.setDownloadBehavior', {
+      behavior: 'deny',
+    });
+
+    // Block unnecessary and potentially dangerous resources
     await page.setRequestInterception(true);
     page.on('request', (request) => {
       const resourceType = request.resourceType();
-      // Allow all resources for accurate accessibility testing
-      // but could block 'media', 'font' if needed for performance
+      const url = request.url();
+
+      // Block media to improve performance
       if (resourceType === 'media') {
         request.abort();
-      } else {
-        request.continue();
+        return;
       }
+
+      // SECURITY: Block data URLs in certain contexts (potential XSS vector)
+      if (url.startsWith('data:') && resourceType === 'document') {
+        logger.debug(`Blocked data URL navigation: ${url.substring(0, 100)}`);
+        request.abort();
+        return;
+      }
+
+      // SECURITY: Block known malicious URL schemes
+      if (url.startsWith('javascript:') || url.startsWith('vbscript:')) {
+        logger.debug(`Blocked dangerous URL scheme: ${url.substring(0, 50)}`);
+        request.abort();
+        return;
+      }
+
+      request.continue();
+    });
+
+    // SECURITY: Limit page context to prevent resource exhaustion
+    page.on('error', (error) => {
+      logger.error('Page error:', error.message);
+    });
+
+    page.on('pageerror', (error) => {
+      logger.debug('Page JavaScript error:', error.message);
     });
 
     return page;

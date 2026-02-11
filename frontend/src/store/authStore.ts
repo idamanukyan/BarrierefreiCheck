@@ -65,8 +65,9 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
-        } catch (error: any) {
-          const message = error.response?.data?.detail || 'Login fehlgeschlagen';
+        } catch (error: unknown) {
+          const axiosError = error as { response?: { data?: { detail?: string } } };
+          const message = axiosError.response?.data?.detail || 'Login fehlgeschlagen';
           set({ isLoading: false, error: message });
           throw new Error(message);
         }
@@ -88,8 +89,9 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
-        } catch (error: any) {
-          const message = error.response?.data?.detail || 'Registrierung fehlgeschlagen';
+        } catch (error: unknown) {
+          const axiosError = error as { response?: { data?: { detail?: string } } };
+          const message = axiosError.response?.data?.detail || 'Registrierung fehlgeschlagen';
           set({ isLoading: false, error: message });
           throw new Error(message);
         }

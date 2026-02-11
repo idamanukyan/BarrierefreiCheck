@@ -5,6 +5,17 @@
  */
 
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
+import type {
+  User,
+  Scan,
+  Issue,
+  Plan,
+  Subscription,
+  Usage,
+  Payment,
+  DashboardStats,
+  PaginatedResponse,
+} from '../types';
 
 // API base URL from environment
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -73,20 +84,20 @@ async function request<T>(config: AxiosRequestConfig): Promise<T> {
 // Auth API
 export const authApi = {
   login: (email: string, password: string) =>
-    request<{ user: any; token: string }>({
+    request<{ user: User; token: string }>({
       method: 'POST',
       url: '/auth/login',
       data: { email, password },
     }),
 
   register: (data: { email: string; password: string; name: string; company?: string }) =>
-    request<{ user: any; token: string }>({
+    request<{ user: User; token: string }>({
       method: 'POST',
       url: '/auth/register',
       data,
     }),
 
-  me: () => request<any>({ method: 'GET', url: '/auth/me' }),
+  me: () => request<User>({ method: 'GET', url: '/auth/me' }),
 
   forgotPassword: (email: string) =>
     request<{ message: string }>({
@@ -117,33 +128,33 @@ export interface CreateScanData {
 
 export const scansApi = {
   create: (data: CreateScanData) =>
-    request<any>({
+    request<Scan>({
       method: 'POST',
       url: '/scans',
       data,
     }),
 
   list: (params?: { page?: number; pageSize?: number; status?: string }) =>
-    request<PaginatedResponse<any>>({
+    request<PaginatedResponse<Scan>>({
       method: 'GET',
       url: '/scans',
       params,
     }),
 
   get: (scanId: string) =>
-    request<any>({
+    request<Scan>({
       method: 'GET',
       url: `/scans/${scanId}`,
     }),
 
   getResults: (scanId: string) =>
-    request<any>({
+    request<Scan>({
       method: 'GET',
       url: `/scans/${scanId}/results`,
     }),
 
   getIssues: (scanId: string, params?: { page?: number; impact?: string; wcagLevel?: string }) =>
-    request<PaginatedResponse<any>>({
+    request<PaginatedResponse<Issue>>({
       method: 'GET',
       url: `/scans/${scanId}/issues`,
       params,
@@ -156,13 +167,13 @@ export const scansApi = {
     }),
 
   cancel: (scanId: string) =>
-    request<any>({
+    request<Scan>({
       method: 'POST',
       url: `/scans/${scanId}/cancel`,
     }),
 
   rescan: (scanId: string) =>
-    request<any>({
+    request<Scan>({
       method: 'POST',
       url: `/scans/${scanId}/rescan`,
     }),
@@ -180,6 +191,17 @@ export interface CreateReportData {
   };
 }
 
+export interface Report {
+  id: string;
+  scanId: string;
+  format: 'pdf' | 'html' | 'json' | 'csv';
+  language: 'de' | 'en';
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  downloadUrl?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
 export const reportsApi = {
   create: (data: CreateReportData) =>
     request<{ reportId: string; downloadUrl: string }>({
@@ -189,14 +211,14 @@ export const reportsApi = {
     }),
 
   list: (params?: { page?: number; pageSize?: number }) =>
-    request<PaginatedResponse<any>>({
+    request<PaginatedResponse<Report>>({
       method: 'GET',
       url: '/reports',
       params,
     }),
 
   get: (reportId: string) =>
-    request<any>({
+    request<Report>({
       method: 'GET',
       url: `/reports/${reportId}`,
     }),
@@ -206,10 +228,10 @@ export const reportsApi = {
 
 // User API
 export const userApi = {
-  getProfile: () => request<any>({ method: 'GET', url: '/users/profile' }),
+  getProfile: () => request<User>({ method: 'GET', url: '/users/profile' }),
 
   updateProfile: (data: { name?: string; company?: string; phone?: string }) =>
-    request<any>({
+    request<User>({
       method: 'PATCH',
       url: '/users/profile',
       data,
@@ -238,16 +260,7 @@ export const userApi = {
 // Dashboard API
 export const dashboardApi = {
   getStats: () =>
-    request<{
-      totalScans: number;
-      pagesScanned: number;
-      issuesFound: number;
-      averageScore: number;
-      recentScans: any[];
-      issuesByImpact: Record<string, number>;
-      issuesByWcag: Record<string, number>;
-      scoreHistory: { date: string; score: number }[];
-    }>({
+    request<DashboardStats>({
       method: 'GET',
       url: '/dashboard/stats',
     }),

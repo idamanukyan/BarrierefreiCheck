@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '../hooks/useTranslation';
 import { Card, CardHeader, CardTitle, CardContent, Button, Alert, Badge } from '../components/common';
+import type { Plan, Subscription, Usage, Payment, PlanId } from '../types';
 
 // Mock API - replace with actual API calls
 const billingApi = {
@@ -99,7 +100,7 @@ const Billing: React.FC = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'overview' | 'plans' | 'payments')}
               className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
@@ -127,15 +128,15 @@ const Billing: React.FC = () => {
 
 // Overview Tab
 interface OverviewTabProps {
-  subscription: any;
-  usage: any;
-  plans: any[];
+  subscription?: Subscription;
+  usage?: Usage;
+  plans?: Plan[];
 }
 
 const OverviewTab: React.FC<OverviewTabProps> = ({ subscription, usage, plans }) => {
   const { t, formatDate } = useTranslation();
 
-  const currentPlan = plans?.find((p: any) => p.id === subscription?.plan);
+  const currentPlan = plans?.find((p: Plan) => p.id === subscription?.plan);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -228,8 +229,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ subscription, usage, plans })
 
 // Plans Tab
 interface PlansTabProps {
-  plans: any[];
-  currentPlan: string;
+  plans?: Plan[];
+  currentPlan?: PlanId;
 }
 
 const PlansTab: React.FC<PlansTabProps> = ({ plans, currentPlan }) => {
@@ -237,7 +238,7 @@ const PlansTab: React.FC<PlansTabProps> = ({ plans, currentPlan }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {plans?.map((plan: any) => (
+      {plans?.map((plan: Plan) => (
         <Card
           key={plan.id}
           className={`relative ${
@@ -303,7 +304,7 @@ const PlansTab: React.FC<PlansTabProps> = ({ plans, currentPlan }) => {
 
 // Payments Tab
 interface PaymentsTabProps {
-  payments: any[];
+  payments?: Payment[];
 }
 
 const PaymentsTab: React.FC<PaymentsTabProps> = ({ payments }) => {
@@ -345,7 +346,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ payments }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {payments.map((payment: any) => (
+            {payments.map((payment: Payment) => (
               <tr key={payment.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {formatDate(payment.created_at)}

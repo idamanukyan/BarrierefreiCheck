@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '../hooks/useTranslation';
 import { scansApi } from '../services/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, StatusBadge, ScoreBadge, ImpactBadge, WcagBadge, Alert } from '../components/common';
+import type { Scan, Issue, Page } from '../types';
 
 const ScanDetail: React.FC = () => {
   const { scanId } = useParams<{ scanId: string }>();
@@ -170,7 +171,7 @@ const ScanProgress: React.FC<ScanProgressProps> = ({ progress }) => {
 };
 
 // Summary tab
-const SummaryTab: React.FC<{ scan: any }> = ({ scan }) => {
+const SummaryTab: React.FC<{ scan: Scan }> = ({ scan }) => {
   const { t, formatDate, formatNumber, formatDuration } = useTranslation();
 
   const impactData = scan.issuesByImpact || {};
@@ -352,7 +353,7 @@ const IssuesTab: React.FC<{ scanId: string }> = ({ scanId }) => {
         </Card>
       ) : (
         <div className="space-y-4">
-          {issues.map((issue: any) => (
+          {issues.map((issue: Issue) => (
             <IssueCard key={issue.id} issue={issue} />
           ))}
         </div>
@@ -362,7 +363,7 @@ const IssuesTab: React.FC<{ scanId: string }> = ({ scanId }) => {
 };
 
 // Issue card component
-const IssueCard: React.FC<{ issue: any }> = ({ issue }) => {
+const IssueCard: React.FC<{ issue: Issue }> = ({ issue }) => {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
@@ -433,7 +434,7 @@ const IssueCard: React.FC<{ issue: any }> = ({ issue }) => {
 };
 
 // Pages tab
-const PagesTab: React.FC<{ scan: any }> = ({ scan }) => {
+const PagesTab: React.FC<{ scan: Scan }> = ({ scan }) => {
   const { t, formatNumber } = useTranslation();
   const pages = scan.pages || [];
 
@@ -455,7 +456,7 @@ const PagesTab: React.FC<{ scan: any }> = ({ scan }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {pages.map((page: any, index: number) => (
+            {pages.map((page: Page, index: number) => (
               <tr key={index} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <p className="text-sm text-gray-900 truncate max-w-md">{page.url}</p>
