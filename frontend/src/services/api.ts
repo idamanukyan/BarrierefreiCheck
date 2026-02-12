@@ -29,9 +29,55 @@ export const api: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor for logging
+/**
+ * Get auth token from localStorage
+ * This ensures token is available even before Zustand store rehydrates
+ */
+const getStoredToken = (): string | null => {
+  try {
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+};
+
+/**
+ * Set auth token in axios defaults
+ * Call this after login/register to ensure all subsequent requests are authenticated
+ */
+export const setAuthToken = (token: string | null): void => {
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+  }
+};
+
+/**
+ * Clear auth token from axios defaults
+ * Call this on logout
+ */
+export const clearAuthToken = (): void => {
+  delete api.defaults.headers.common['Authorization'];
+};
+
+// Request interceptor for auth token and logging
 api.interceptors.request.use(
   (config) => {
+    // Ensure auth token is set from storage if not already present
+    // This handles race conditions during page refresh before Zustand rehydrates
+    if (!config.headers['Authorization']) {
+      const token = getStoredToken();
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+
     // Log requests in development
     if (import.meta.env.DEV) {
       console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
@@ -266,4 +312,5 @@ export const dashboardApi = {
     }),
 };
 
+export { setAuthToken, clearAuthToken };
 export default api;

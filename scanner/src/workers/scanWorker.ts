@@ -55,8 +55,8 @@ async function scanPage(
       timeout: 30000,
     });
 
-    // Wait for page to settle
-    await page.waitForTimeout(1000);
+    // Wait for page to settle (using setTimeout instead of deprecated waitForTimeout)
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Run axe-core analysis
     const result = await axeRunner.analyze(page, url);
