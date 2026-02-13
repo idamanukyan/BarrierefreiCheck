@@ -16,7 +16,7 @@ from passlib.context import CryptContext
 
 from app.database import get_db
 from app.config import settings
-from app.models import User
+from app.models import User, APIKey, hash_api_key
 from app.services.rate_limiter import limiter, AUTH_RATE_LIMIT, REGISTER_RATE_LIMIT
 from app.services.cache import blacklist_token, is_token_blacklisted
 
@@ -25,8 +25,11 @@ router = APIRouter()
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# OAuth2 scheme - auto_error=False to allow API key fallback
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+# API Key header name
+API_KEY_HEADER = "X-API-Key"
 
 
 # Password validation constants
@@ -130,15 +133,81 @@ def create_refresh_token(data: dict) -> str:
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+async def get_user_from_api_key(
+    api_key: str,
+    db: Session
+) -> Optional[User]:
+    """
+    Authenticate user via API key.
+
+    Returns the user if the API key is valid, None otherwise.
+    """
+    if not api_key or not api_key.startswith("ac_"):
+        return None
+
+    # Hash the key to look it up
+    key_hash = hash_api_key(api_key)
+
+    # Find the API key
+    api_key_record = db.query(APIKey).filter(
+        APIKey.key_hash == key_hash,
+    ).first()
+
+    if not api_key_record:
+        return None
+
+    # Check if key is valid
+    if not api_key_record.is_valid:
+        return None
+
+    # Get the user
+    user = db.query(User).filter(User.id == api_key_record.user_id).first()
+
+    if user and user.is_active:
+        # Record usage
+        api_key_record.record_usage()
+        db.commit()
+        return user
+
+    return None
+
+
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
+    """
+    Get the current authenticated user.
+
+    Supports two authentication methods:
+    1. JWT Bearer token (Authorization: Bearer <token>)
+    2. API Key (X-API-Key: <api_key>)
+
+    JWT tokens are checked first, then API keys.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # Try API key authentication first (from header)
+    api_key = request.headers.get(API_KEY_HEADER)
+    if api_key:
+        user = await get_user_from_api_key(api_key, db)
+        if user:
+            return user
+        # If API key was provided but invalid, reject immediately
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "X-API-Key"},
+        )
+
+    # No API key, try JWT token
+    if not token:
+        raise credentials_exception
 
     # Check if token has been blacklisted (logged out)
     if is_token_blacklisted(token):

@@ -15,6 +15,7 @@ from app.models.billing import (
     PaymentStatus,
     ReportFormat,
 )
+from app.models.api_key import APIKey, hash_api_key
 
 __all__ = [
     "User",
@@ -32,4 +33,6 @@ __all__ = [
     "SubscriptionStatus",
     "PaymentStatus",
     "ReportFormat",
+    "APIKey",
+    "hash_api_key",
 ]
