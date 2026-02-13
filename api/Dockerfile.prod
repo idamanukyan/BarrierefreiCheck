@@ -1,6 +1,9 @@
 # Production Dockerfile for API
 # Multi-stage build for smaller image size
 
+# Version argument for semantic versioning
+ARG VERSION=0.1.0
+
 # Build stage
 FROM python:3.11-slim AS builder
 
@@ -53,10 +56,14 @@ RUN mkdir -p /app/app/templates && chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
+# Re-declare ARG after FROM to use it
+ARG VERSION
+
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    APP_ENV=production
+    APP_ENV=production \
+    APP_VERSION=${VERSION}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

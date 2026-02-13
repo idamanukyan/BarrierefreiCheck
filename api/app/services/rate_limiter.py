@@ -107,6 +107,29 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
 
 
 # Rate limit configurations
+# Authentication
 AUTH_RATE_LIMIT = "5/minute"  # 5 requests per minute for auth endpoints
 REGISTER_RATE_LIMIT = "3/minute"  # 3 registrations per minute
 PASSWORD_RESET_RATE_LIMIT = "3/minute"  # 3 password reset requests per minute
+
+# Scans
+SCAN_CREATE_LIMIT = "10/minute"  # Creating scans is resource-intensive
+SCAN_READ_LIMIT = "60/minute"    # Reading scan data
+SCAN_LIST_LIMIT = "30/minute"    # Listing scans
+
+# Dashboard
+DASHBOARD_RATE_LIMIT = "30/minute"  # Dashboard stats
+
+# Reports
+REPORT_CREATE_LIMIT = "10/minute"   # Report generation is resource-intensive
+REPORT_DOWNLOAD_LIMIT = "30/minute" # Downloads are less intensive
+
+# Export
+EXPORT_RATE_LIMIT = "20/minute"  # Exports can be resource-intensive
+
+# Billing
+CHECKOUT_RATE_LIMIT = "5/minute"       # Prevent checkout abuse
+SUBSCRIPTION_RATE_LIMIT = "10/minute"  # Subscription modifications
+
+# Default for general endpoints
+DEFAULT_RATE_LIMIT = "100/minute"

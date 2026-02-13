@@ -120,28 +120,37 @@ npm run dev
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+Copy `.env.example` to `.env` and configure. See `.env.example` for all options with documentation.
 
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/accessibilitychecker
+#### Required Variables
 
-# Redis
-REDIS_URL=redis://localhost:6379
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/db` |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| `JWT_SECRET` | Secret for JWT signing (32+ chars) | Use `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `S3_ENDPOINT` | MinIO/S3 endpoint URL | `http://localhost:9000` |
+| `S3_ACCESS_KEY` | S3 access key | Your MinIO access key |
+| `S3_SECRET_KEY` | S3 secret key | Your MinIO secret key |
 
-# MinIO/S3
-S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
+#### Optional Variables
 
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `APP_ENV` | Environment (`development`/`production`) | `development` |
+| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `http://localhost:3000` |
+| `TRUSTED_PROXIES` | Trusted proxy CIDRs for X-Forwarded-For | (empty) |
+| `STRIPE_SECRET_KEY` | Stripe API key for payments | (empty) |
+| `SMTP_HOST` | SMTP server for emails | `localhost` |
+| `EMAIL_ENABLED` | Enable/disable email sending | `true` |
+| `VITE_API_URL` | API URL for frontend | `http://localhost:8000/api/v1` |
 
-# JWT
-JWT_SECRET=your-secret-key
-JWT_ALGORITHM=HS256
-```
+#### Security Notes
+
+- **Never commit `.env` files** - They are gitignored by default
+- **Production**: Set `APP_ENV=production` to enable security validations
+- **JWT_SECRET**: Must be at least 32 characters in production
+- See [SECURITY.md](SECURITY.md) for security best practices
 
 ## API Endpoints
 

@@ -7,7 +7,7 @@ API endpoints for dashboard statistics.
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -16,8 +16,12 @@ from ..database import get_db
 from ..models import Scan, ScanStatus, User
 from ..routers.auth import get_current_user
 from ..services.cache import cache_get, cache_set, cache_delete_pattern
+from ..services.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
+
+# Rate limit for dashboard operations
+DASHBOARD_RATE_LIMIT = "30/minute"
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -52,7 +56,9 @@ class DashboardStats(BaseModel):
 
 
 @router.get("/stats", response_model=DashboardStats)
+@limiter.limit(DASHBOARD_RATE_LIMIT)
 async def get_dashboard_stats(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

@@ -2,9 +2,13 @@
 AccessibilityChecker API - Main Application Entry Point
 """
 
+import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
+
+# Version from environment (set during Docker build) or default
+__version__ = os.getenv("APP_VERSION", "0.1.0")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
@@ -77,7 +81,7 @@ for BFSG/WCAG 2.1 compliance.
 ### BFSG Deadline
 ⚠️ All German e-commerce websites must be accessible by **June 28, 2025**.
     """,
-    version="0.1.0",
+    version=__version__,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
@@ -159,7 +163,7 @@ async def root():
     """Root endpoint - API information"""
     return {
         "name": "AccessibilityChecker API",
-        "version": "0.1.0",
+        "version": __version__,
         "description": "BFSG Compliance & WCAG 2.1 Testing Platform",
         "docs": "/api/docs",
     }
