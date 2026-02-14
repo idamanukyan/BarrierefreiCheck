@@ -23,6 +23,7 @@ from app.routers.dashboard import router as dashboard_router
 from app.routers.websocket import router as websocket_router
 from app.routers.export import router as export_router
 from app.routers.api_keys import router as api_keys_router
+from app.routers.gdpr import router as gdpr_router
 from app.services.rate_limiter import limiter, rate_limit_exceeded_handler
 from app.services.metrics import MetricsMiddleware, get_metrics
 from app.middleware import (
@@ -216,6 +217,7 @@ async def metrics():
 # Include routers
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(api_keys_router, prefix="/api/v1/api-keys", tags=["API Keys"])
+app.include_router(gdpr_router, prefix="/api/v1/users/me", tags=["GDPR"])
 app.include_router(dashboard_router, prefix="/api/v1", tags=["Dashboard"])
 app.include_router(scans_router, prefix="/api/v1/scans", tags=["Scans"])
 app.include_router(reports_router, prefix="/api/v1", tags=["Reports"])

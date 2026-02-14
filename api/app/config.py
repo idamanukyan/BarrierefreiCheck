@@ -141,6 +141,10 @@ class Settings(BaseSettings):
     default_crawl_limit: int = 100
     max_crawl_limit: int = 1000
 
+    # GDPR Data Retention Settings
+    # Default: 730 days (2 years) for German commercial records (HGB § 257)
+    data_retention_days: int = 730
+
     # WebSocket Settings
     ws_ping_interval_seconds: int = 30  # Send ping every 30 seconds
     ws_max_connection_duration_seconds: int = 86400  # Max 24 hours per connection
