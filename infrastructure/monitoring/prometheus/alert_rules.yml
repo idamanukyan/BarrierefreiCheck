@@ -1,0 +1,150 @@
+# Alert Rules for BarrierefreiCheck
+# These alerts are displayed in Grafana's Alerting panel
+
+groups:
+  - name: api_alerts
+    rules:
+      # Critical: High error rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API error rate"
+          description: "Error rate is above 5% for the last 5 minutes (current: {{ $value | humanizePercentage }})"
+
+      # Critical: API latency p99 too high
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API latency"
+          description: "99th percentile latency is above 5 seconds (current: {{ $value | humanizeDuration }})"
+
+      # Warning: Elevated error rate
+      - alert: ElevatedErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated API error rate"
+          description: "Error rate is above 1% for the last 10 minutes (current: {{ $value | humanizePercentage }})"
+
+      # Warning: High p95 latency
+      - alert: ElevatedAPILatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated API latency"
+          description: "95th percentile latency is above 2 seconds (current: {{ $value | humanizeDuration }})"
+
+  - name: scan_alerts
+    rules:
+      # Critical: High scan failure rate
+      - alert: HighScanFailureRate
+        expr: |
+          (
+            sum(rate(scans_total{status="failed"}[15m]))
+            /
+            sum(rate(scans_total[15m]))
+          ) > 0.20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High scan failure rate"
+          description: "More than 20% of scans are failing (current: {{ $value | humanizePercentage }})"
+
+      # Warning: Scans queue building up
+      - alert: HighActiveScanCount
+        expr: scans_in_progress > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of active scans"
+          description: "{{ $value }} scans currently in progress, possible queue backup"
+
+  - name: database_alerts
+    rules:
+      # Critical: Slow database queries
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, sum(rate(db_query_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Slow database queries"
+          description: "95th percentile DB query time is above 1 second (current: {{ $value | humanizeDuration }})"
+
+  - name: cache_alerts
+    rules:
+      # Warning: Low cache hit rate
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            sum(rate(cache_hits_total[5m]))
+            /
+            (sum(rate(cache_hits_total[5m])) + sum(rate(cache_misses_total[5m])))
+          ) < 0.80
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is below 80% (current: {{ $value | humanizePercentage }})"
+
+  - name: external_service_alerts
+    rules:
+      # Warning: External service errors
+      - alert: ExternalServiceErrors
+        expr: |
+          (
+            sum by (service) (rate(external_service_requests_total{status="failure"}[5m]))
+            /
+            sum by (service) (rate(external_service_requests_total[5m]))
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "External service errors"
+          description: "{{ $labels.service }} has >10% error rate (current: {{ $value | humanizePercentage }})"
+
+      # Warning: Slow external service
+      - alert: SlowExternalService
+        expr: histogram_quantile(0.95, sum by (service, le) (rate(external_service_latency_seconds_bucket[5m]))) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow external service"
+          description: "{{ $labels.service }} p95 latency is above 3 seconds"
+
+  - name: availability_alerts
+    rules:
+      # Critical: API is down
+      - alert: APIDown
+        expr: up{job="api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API is down"
+          description: "The API service is not responding to Prometheus scrapes"

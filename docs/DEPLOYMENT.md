@@ -317,10 +317,62 @@ docker system df
 ### Prometheus Metrics
 
 Metrics available at `/metrics`:
-- `http_requests_total` - Request count by endpoint
-- `http_request_duration_seconds` - Request latency
-- `scan_created_total` - Scans created
-- `report_generated_total` - Reports generated
+- `http_requests_total` - Request count by endpoint and status code
+- `http_request_duration_seconds` - Request latency histogram
+- `scans_total` - Scans by status (created/completed/failed)
+- `scan_duration_seconds` - Scan duration histogram
+- `accessibility_issues_total` - Issues found by impact level
+- `reports_generated_total` - Reports by format and status
+- `auth_attempts_total` - Authentication events
+- `db_query_duration_seconds` - Database query latency
+- `cache_hits_total` / `cache_misses_total` - Cache performance
+- `external_service_requests_total` - External API calls
+
+### Grafana Dashboards
+
+Grafana provides visualization and alerting for all metrics.
+
+**Access:**
+- Development: http://localhost:3001
+- Production: https://monitoring.yourdomain.de (or port 3001)
+- Default credentials: `admin` / (set in `GRAFANA_ADMIN_PASSWORD`)
+
+**Available Dashboards:**
+
+| Dashboard | Description |
+|-----------|-------------|
+| API Overview | Request rates, latency percentiles, error rates, endpoint breakdown |
+| Scan Metrics | Scan throughput, duration, failure rates, issues by impact |
+| Business Metrics | Auth attempts, reports generated, cache hit rates, external services |
+| Infrastructure | Database query latency, WebSocket connections, email delivery |
+
+**Starting Monitoring Services:**
+
+```bash
+# Development
+docker compose up -d prometheus grafana
+
+# Production
+docker compose -f docker-compose.prod.yml up -d prometheus grafana
+
+# View Grafana logs
+docker compose logs -f grafana
+```
+
+**Alert Rules:**
+
+Alerts are displayed in Grafana's Alerting panel (no external notifications configured by default).
+
+| Alert | Threshold | Severity |
+|-------|-----------|----------|
+| HighErrorRate | >5% 5xx errors for 5min | Critical |
+| HighAPILatency | p99 >5s for 5min | Critical |
+| HighScanFailureRate | >20% failures for 5min | Critical |
+| SlowDatabaseQueries | p95 >1s for 5min | Critical |
+| ElevatedErrorRate | >1% 5xx for 10min | Warning |
+| LowCacheHitRate | <80% for 15min | Warning |
+
+To view alerts: Grafana → Alerting → Alert rules
 
 ## Troubleshooting
 
