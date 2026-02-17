@@ -17,15 +17,15 @@ from app.database import get_db
 from app.services.cache import cache_get, cache_set, cache_delete
 from app.services.metrics import record_scan_created
 from app.services.queue import add_scan_job, cancel_job
-from app.services.rate_limiter import limiter
+from app.services.rate_limiter import (
+    limiter,
+    plan_limit_scan_create,
+    plan_limit_scan_read,
+    plan_limit_scan_list,
+)
 from app.utils.validators import validate_scan_url, URLValidationError
 
 logger = logging.getLogger(__name__)
-
-# Rate limits for scan operations
-SCAN_CREATE_LIMIT = "10/minute"  # Creating scans is resource-intensive
-SCAN_READ_LIMIT = "60/minute"    # Reading scan data
-SCAN_LIST_LIMIT = "30/minute"    # Listing scans
 from app.config import settings
 from app.models.scan import Scan, Page, Issue, ScanStatus, ImpactLevel, WcagLevel
 from app.models import User
@@ -93,7 +93,7 @@ def get_current_month_scan_count(db: Session, user_id: UUID) -> int:
 
 
 @router.post("", response_model=ScanResponse, status_code=201)
-@limiter.limit(SCAN_CREATE_LIMIT)
+@limiter.limit(plan_limit_scan_create)
 async def create_scan(
     request: Request,
     scan_data: ScanCreate,
@@ -191,7 +191,7 @@ async def create_scan(
 
 
 @router.get("", response_model=ScanListResponse)
-@limiter.limit(SCAN_LIST_LIMIT)
+@limiter.limit(plan_limit_scan_list)
 async def list_scans(
     request: Request,
     page: int = Query(1, ge=1, description="Page number"),
@@ -235,7 +235,7 @@ async def list_scans(
 
 
 @router.get("/{scan_id}", response_model=ScanResponse)
-@limiter.limit(SCAN_READ_LIMIT)
+@limiter.limit(plan_limit_scan_read)
 async def get_scan(
     request: Request,
     scan_id: UUID,
@@ -271,7 +271,7 @@ async def get_scan(
 
 
 @router.delete("/{scan_id}", status_code=204)
-@limiter.limit(SCAN_READ_LIMIT)
+@limiter.limit(plan_limit_scan_read)
 async def delete_scan(
     request: Request,
     scan_id: UUID,
@@ -300,7 +300,7 @@ async def delete_scan(
 
 
 @router.get("/{scan_id}/issues", response_model=IssueListResponse)
-@limiter.limit(SCAN_READ_LIMIT)
+@limiter.limit(plan_limit_scan_read)
 async def get_scan_issues(
     request: Request,
     scan_id: UUID,
@@ -400,7 +400,7 @@ async def get_scan_issues(
 
 
 @router.get("/{scan_id}/pages", response_model=PageListResponse)
-@limiter.limit(SCAN_READ_LIMIT)
+@limiter.limit(plan_limit_scan_read)
 async def get_scan_pages(
     request: Request,
     scan_id: UUID,
@@ -457,7 +457,7 @@ async def get_scan_pages(
 
 
 @router.post("/{scan_id}/cancel", response_model=ScanResponse)
-@limiter.limit(SCAN_CREATE_LIMIT)
+@limiter.limit(plan_limit_scan_create)
 async def cancel_scan(
     request: Request,
     scan_id: UUID,

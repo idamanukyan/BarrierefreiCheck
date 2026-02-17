@@ -9,7 +9,7 @@ import { Worker, Job } from 'bullmq';
 import { Page } from 'puppeteer';
 import { BrowserManager, getBrowserManager, closeBrowserManager } from '../utils/browser.js';
 import { logger } from '../utils/logger.js';
-import { validateUrl } from '../utils/url.js';
+import { validateUrl, validateUrlWithSSRFProtection } from '../utils/url.js';
 import { Crawler, CrawlOptions } from '../crawler/crawler.js';
 import { AxeRunner, getAxeRunner } from '../axe/runner.js';
 import { captureHighlightedScreenshot, getSafeScreenshotDir } from '../utils/screenshot.js';
@@ -175,9 +175,10 @@ async function processScanJob(job: Job<ScanJobData>): Promise<ScanResult> {
     logger.warn(`Failed to update scan status: ${dbError}`);
   }
 
-  // Validate URL
-  const validation = validateUrl(url);
+  // Validate URL with SSRF protection (defense-in-depth, URL should already be validated by API)
+  const validation = await validateUrlWithSSRFProtection(url);
   if (!validation.valid || !validation.url) {
+    logger.warn(`SSRF validation failed for scan ${scanId}: ${validation.error}`);
     throw new Error(validation.error || 'Invalid URL');
   }
 

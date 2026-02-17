@@ -10,6 +10,7 @@ import { BrowserManager, getBrowserManager } from '../utils/browser.js';
 import { logger } from '../utils/logger.js';
 import {
   validateUrl,
+  validateUrlWithSSRFProtection,
   normalizeUrl,
   getDomain,
   isSameDomain,
@@ -90,9 +91,10 @@ export class Crawler {
     this.isRunning = true;
     this.shouldStop = false;
 
-    // Validate start URL
-    const validation = validateUrl(startUrl);
+    // Validate start URL with SSRF protection (includes DNS resolution check)
+    const validation = await validateUrlWithSSRFProtection(startUrl);
     if (!validation.valid || !validation.url) {
+      logger.warn(`SSRF validation failed for ${startUrl}: ${validation.error}`);
       return {
         baseUrl: startUrl,
         domain: '',

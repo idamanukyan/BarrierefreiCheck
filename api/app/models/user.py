@@ -2,8 +2,14 @@
 User Model
 
 Defines the User table for authentication and user management.
+
+PII Protection:
+- full_name and company fields are encrypted at rest
+- email is stored in plaintext for lookups but email_hash provides a searchable hash
+- All PII is subject to GDPR data retention policies
 """
 
+import hashlib
 import uuid
 from datetime import datetime, timezone
 
@@ -11,10 +17,11 @@ from datetime import datetime, timezone
 def utc_now():
     """Return current UTC time as timezone-aware datetime."""
     return datetime.now(timezone.utc)
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.utils.encrypted_type import EncryptedString
 import enum
 
 
@@ -28,15 +35,27 @@ class PlanType(enum.Enum):
 
 
 class User(Base):
-    """User model for authentication and account management."""
+    """
+    User model for authentication and account management.
+
+    PII Fields (encrypted at rest):
+    - full_name: User's full name (encrypted)
+    - company: Company/organization name (encrypted)
+
+    Note: email is not encrypted to allow for efficient lookups,
+    but it's protected through access controls and audit logging.
+    """
 
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(255), nullable=True)
-    company = Column(String(255), nullable=True)
+
+    # PII fields - encrypted at rest
+    # Using EncryptedString(512) to accommodate encryption overhead
+    full_name = Column(EncryptedString(512), nullable=True)
+    company = Column(EncryptedString(512), nullable=True)
 
     # Subscription
     plan = Column(SQLEnum(PlanType), default=PlanType.FREE, nullable=False)

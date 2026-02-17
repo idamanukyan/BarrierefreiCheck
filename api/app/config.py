@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
 
+    # Field Encryption
+    # SECURITY: If set, used for encrypting PII fields in the database
+    # Must be a valid Fernet key (32 bytes, base64-encoded)
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # If not set, encryption key is derived from JWT_SECRET
+    field_encryption_key: Optional[str] = None
+
     # S3/MinIO
     # SECURITY: s3_access_key and s3_secret_key MUST be set via environment variables
     s3_endpoint: str = "http://localhost:9000"

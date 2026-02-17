@@ -31,6 +31,7 @@ from app.middleware import (
     SecurityHeadersMiddleware,
     APIVersionMiddleware,
     RequestSizeLimitMiddleware,
+    UserContextMiddleware,
 )
 from app.middleware.correlation_id import setup_logging_with_correlation_id
 from app.exceptions import (
@@ -126,6 +127,7 @@ app.add_middleware(
         "Origin",
         "X-Requested-With",
         "X-Correlation-ID",
+        "X-API-Key",
     ],
     # Expose headers that frontend may need to read
     expose_headers=[
@@ -157,6 +159,10 @@ app.add_middleware(
 
 # Request size limit middleware (10MB max)
 app.add_middleware(RequestSizeLimitMiddleware, max_size_bytes=MAX_REQUEST_SIZE)
+
+# User context middleware - extracts user from auth tokens for plan-based rate limiting
+# This must run after request size limit but before routes are processed
+app.add_middleware(UserContextMiddleware)
 
 
 # Root endpoint

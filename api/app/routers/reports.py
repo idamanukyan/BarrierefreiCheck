@@ -19,16 +19,12 @@ from ..database import get_db
 from ..models import User, Scan, Report, ReportFormat as ReportFormatEnum
 from ..services.report_generator import ReportGenerator, ReportFormat
 from ..services.email_service import EmailService
-from ..services.rate_limiter import limiter
+from ..services.rate_limiter import limiter, plan_limit_report_create, plan_limit_report_download
 from ..services.metrics import record_report_generated
 from .auth import get_current_user
 import time as time_module
 
 router = APIRouter(prefix="/reports", tags=["reports"])
-
-# Rate limits for report operations
-REPORT_CREATE_LIMIT = "10/minute"  # Report generation is resource-intensive
-REPORT_DOWNLOAD_LIMIT = "30/minute"  # Downloads are less intensive
 
 
 # Pydantic schemas
@@ -152,7 +148,7 @@ async def generate_report_task(
 
 
 @router.post("", response_model=ReportResponse, status_code=201)
-@limiter.limit(REPORT_CREATE_LIMIT)
+@limiter.limit(plan_limit_report_create)
 async def create_report(
     request: Request,
     report_data: ReportCreate,
@@ -348,7 +344,7 @@ async def get_report(
 
 
 @router.get("/{report_id}/download")
-@limiter.limit(REPORT_DOWNLOAD_LIMIT)
+@limiter.limit(plan_limit_report_download)
 async def download_report(
     request: Request,
     report_id: str,

@@ -16,13 +16,10 @@ from app.database import get_db
 from app.models import User, Scan, Page, Issue
 from app.routers.auth import get_current_user
 from app.services.export import get_export_service
-from app.services.rate_limiter import limiter
+from app.services.rate_limiter import limiter, plan_limit_export
 from app.services.metrics import record_export_created
 
 router = APIRouter(prefix="/export", tags=["Export"])
-
-# Rate limits for export operations
-EXPORT_RATE_LIMIT = "20/minute"  # Exports can be resource-intensive
 
 
 class ExportFormat(str, Enum):
@@ -32,7 +29,7 @@ class ExportFormat(str, Enum):
 
 
 @router.get("/scans/{scan_id}/issues")
-@limiter.limit(EXPORT_RATE_LIMIT)
+@limiter.limit(plan_limit_export)
 async def export_scan_issues(
     request: Request,
     scan_id: UUID,
@@ -106,7 +103,7 @@ async def export_scan_issues(
 
 
 @router.get("/scans/{scan_id}/summary")
-@limiter.limit(EXPORT_RATE_LIMIT)
+@limiter.limit(plan_limit_export)
 async def export_scan_summary(
     request: Request,
     scan_id: UUID,
@@ -161,7 +158,7 @@ async def export_scan_summary(
 
 
 @router.get("/scans/{scan_id}/pages")
-@limiter.limit(EXPORT_RATE_LIMIT)
+@limiter.limit(plan_limit_export)
 async def export_scan_pages(
     request: Request,
     scan_id: UUID,
