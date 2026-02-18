@@ -1,11 +1,17 @@
 /**
  * Application Entry Point
+ *
+ * Initializes the React application with performance monitoring.
  */
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { initWebVitals } from './utils/webVitals';
+
+// Initialize Web Vitals performance monitoring
+initWebVitals();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
