@@ -138,11 +138,38 @@ def get_db_context() -> Generator[Session, None, None]:
     Context manager for getting database sessions.
     Use this for non-FastAPI contexts (e.g., background tasks).
 
+    Includes retry logic for transient connection failures.
+
     Usage:
         with get_db_context() as db:
             user = db.query(User).first()
     """
-    db = SessionLocal()
+    db = None
+    last_error = None
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            db = SessionLocal()
+            # Verify connection is working
+            db.execute("SELECT 1" if "postgresql" in settings.database_url else "SELECT 1")
+            break
+        except OperationalError as e:
+            last_error = e
+            if db:
+                db.close()
+                db = None
+            delay = min(RETRY_DELAY_BASE * (2 ** attempt), RETRY_DELAY_MAX)
+            logger.warning(
+                f"Database context creation failed (attempt {attempt + 1}/{MAX_RETRIES}), "
+                f"retrying in {delay:.1f}s: {e}"
+            )
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(delay)
+
+    if db is None:
+        logger.error(f"Failed to create database context after {MAX_RETRIES} attempts")
+        raise last_error or OperationalError("Database connection unavailable")
+
     try:
         yield db
     finally:

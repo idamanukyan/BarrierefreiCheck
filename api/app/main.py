@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 # Version from environment (set during Docker build) or default
 __version__ = os.getenv("APP_VERSION", "0.1.0")
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
 
@@ -24,6 +25,7 @@ from app.routers.websocket import router as websocket_router
 from app.routers.export import router as export_router
 from app.routers.api_keys import router as api_keys_router
 from app.routers.gdpr import router as gdpr_router
+from app.routers.admin import router as admin_router
 from app.services.rate_limiter import limiter, rate_limit_exceeded_handler
 from app.services.metrics import MetricsMiddleware, get_metrics
 from app.middleware import (
@@ -32,6 +34,7 @@ from app.middleware import (
     APIVersionMiddleware,
     RequestSizeLimitMiddleware,
     UserContextMiddleware,
+    RequestTimeoutMiddleware,
 )
 from app.middleware.correlation_id import setup_logging_with_correlation_id
 from app.exceptions import (
@@ -164,6 +167,14 @@ app.add_middleware(RequestSizeLimitMiddleware, max_size_bytes=MAX_REQUEST_SIZE)
 # This must run after request size limit but before routes are processed
 app.add_middleware(UserContextMiddleware)
 
+# Request timeout middleware - enforces request time limits
+# Added last so it wraps all other middleware (ASGI middleware order is reversed)
+app.add_middleware(RequestTimeoutMiddleware, default_timeout=30.0)
+
+# GZip compression middleware - compress responses > 500 bytes
+# Added last so compression happens after all processing (ASGI middleware order is reversed)
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
+
 
 # Root endpoint
 @app.get("/")
@@ -230,3 +241,4 @@ app.include_router(reports_router, prefix="/api/v1", tags=["Reports"])
 app.include_router(billing_router, prefix="/api/v1", tags=["Billing"])
 app.include_router(export_router, prefix="/api/v1", tags=["Export"])
 app.include_router(websocket_router, prefix="/api/v1", tags=["WebSocket"])
+app.include_router(admin_router, prefix="/api/v1", tags=["Admin"])

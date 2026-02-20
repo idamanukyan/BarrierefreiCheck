@@ -232,3 +232,33 @@ export async function closeBrowserManager(): Promise<void> {
     browserManagerInstance = null;
   }
 }
+
+/**
+ * Get browser status for health checks
+ */
+export async function getBrowserStatus(): Promise<{
+  available: boolean;
+  connected: boolean;
+  error?: string;
+}> {
+  try {
+    if (!browserManagerInstance) {
+      return {
+        available: true,
+        connected: false,
+      };
+    }
+
+    const connected = browserManagerInstance.isRunning();
+    return {
+      available: true,
+      connected,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      connected: false,
+      error: error instanceof Error ? error.message : 'Browser check failed',
+    };
+  }
+}

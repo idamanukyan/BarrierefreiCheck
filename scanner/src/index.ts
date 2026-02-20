@@ -11,6 +11,7 @@ import { logger } from './utils/logger.js';
 import { createScanWorker, shutdownWorker } from './workers/scanWorker.js';
 import { shutdownQueues, getQueueStatus } from './workers/queue.js';
 import { closeBrowserManager } from './utils/browser.js';
+import { startHealthServer, stopHealthServer } from './health/healthServer.js';
 
 // Load environment variables
 dotenv.config();
@@ -26,6 +27,9 @@ let scanWorker: Worker | null = null;
 
 async function start(): Promise<void> {
   try {
+    // Start health check server
+    startHealthServer();
+
     // Start the scan worker
     scanWorker = createScanWorker(CONCURRENCY);
 
@@ -46,6 +50,9 @@ async function shutdown(signal: string): Promise<void> {
   logger.info(`🛑 Received ${signal}, shutting down...`);
 
   try {
+    // Stop health server first to stop accepting new probes
+    await stopHealthServer();
+
     if (scanWorker) {
       await shutdownWorker(scanWorker);
     }

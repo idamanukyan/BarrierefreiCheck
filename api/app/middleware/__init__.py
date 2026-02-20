@@ -6,6 +6,7 @@ from .correlation_id import CorrelationIdMiddleware, get_correlation_id
 from .security import SecurityHeadersMiddleware
 from .versioning import APIVersionMiddleware, RequestSizeLimitMiddleware
 from .user_context import UserContextMiddleware
+from .timeout import RequestTimeoutMiddleware
 
 __all__ = [
     "CorrelationIdMiddleware",
@@ -14,4 +15,5 @@ __all__ = [
     "APIVersionMiddleware",
     "RequestSizeLimitMiddleware",
     "UserContextMiddleware",
+    "RequestTimeoutMiddleware",
 ]
