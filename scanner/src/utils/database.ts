@@ -180,32 +180,49 @@ export async function persistScanResults(
 
       const pageId = pageInsertResult.rows[0].id;
 
-      // Insert issues for this page
-      for (const issue of pageResult.issues) {
-        await client.query(
-          `INSERT INTO issues (
-            page_id, rule_id, impact, wcag_criteria, wcag_level,
-            bfsg_reference, title_de, description_de, fix_suggestion_de,
-            element_selector, element_html, element_xpath,
-            help_url, screenshot_path
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-          [
-            pageId,
-            issue.ruleId,
-            issue.impact,
-            issue.wcagCriteria || [],
-            issue.wcagLevel,
-            issue.bfsgReference || null,
-            issue.titleDe,
-            issue.descriptionDe || null,
-            issue.fixSuggestionDe || null,
-            issue.element?.selector || null,
-            issue.element?.html || null,
-            issue.element?.xpath || null,
-            issue.helpUrl || null,
-            issue.screenshotPath || null,
-          ]
-        );
+      // Batch insert issues for this page (much faster than individual inserts)
+      if (pageResult.issues.length > 0) {
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < pageResult.issues.length; i += BATCH_SIZE) {
+          const batch = pageResult.issues.slice(i, i + BATCH_SIZE);
+          const values: unknown[] = [];
+          const placeholders: string[] = [];
+
+          batch.forEach((issue, idx) => {
+            const offset = idx * 14;
+            placeholders.push(
+              `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, ` +
+              `$${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, ` +
+              `$${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14})`
+            );
+            values.push(
+              pageId,
+              issue.ruleId,
+              issue.impact,
+              issue.wcagCriteria || [],
+              issue.wcagLevel,
+              issue.bfsgReference || null,
+              issue.titleDe,
+              issue.descriptionDe || null,
+              issue.fixSuggestionDe || null,
+              issue.element?.selector || null,
+              issue.element?.html || null,
+              issue.element?.xpath || null,
+              issue.helpUrl || null,
+              issue.screenshotPath || null
+            );
+          });
+
+          await client.query(
+            `INSERT INTO issues (
+              page_id, rule_id, impact, wcag_criteria, wcag_level,
+              bfsg_reference, title_de, description_de, fix_suggestion_de,
+              element_selector, element_html, element_xpath,
+              help_url, screenshot_path
+            ) VALUES ${placeholders.join(', ')}`,
+            values
+          );
+        }
       }
     }
 

@@ -41,6 +41,9 @@ from app.schemas.scan import (
     ElementInfo,
     PageResponse,
     PageListResponse,
+    ScanComparisonResponse,
+    ScanComparisonItem,
+    IssueChange,
 )
 
 # Cache TTL for completed scans (5 minutes)
@@ -490,3 +493,174 @@ async def cancel_scan(
     cancel_job(scan_id)
 
     return scan_to_response(scan)
+
+
+@router.get("/compare/{scan_id_before}/{scan_id_after}", response_model=ScanComparisonResponse)
+@limiter.limit(plan_limit_scan_read)
+async def compare_scans(
+    request: Request,
+    scan_id_before: UUID,
+    scan_id_after: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Compare two scans to see changes in accessibility issues over time.
+
+    - **scan_id_before**: The earlier scan (baseline)
+    - **scan_id_after**: The later scan to compare against
+
+    Returns detailed comparison including score changes, issues added/removed,
+    and per-rule breakdowns.
+    """
+    # Fetch both scans with their pages
+    scan_before = db.query(Scan).options(
+        joinedload(Scan.pages)
+    ).filter(
+        Scan.id == scan_id_before,
+        Scan.user_id == current_user.id,
+    ).first()
+
+    scan_after = db.query(Scan).options(
+        joinedload(Scan.pages)
+    ).filter(
+        Scan.id == scan_id_after,
+        Scan.user_id == current_user.id,
+    ).first()
+
+    if not scan_before:
+        raise HTTPException(status_code=404, detail="Before scan not found")
+    if not scan_after:
+        raise HTTPException(status_code=404, detail="After scan not found")
+
+    # Both scans must be completed
+    if scan_before.status != ScanStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail="Before scan is not completed"
+        )
+    if scan_after.status != ScanStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail="After scan is not completed"
+        )
+
+    # Get page IDs for both scans
+    before_page_ids = [p.id for p in scan_before.pages]
+    after_page_ids = [p.id for p in scan_after.pages]
+
+    # Get issues grouped by rule_id for both scans
+    def get_issues_by_rule(page_ids):
+        if not page_ids:
+            return {}
+        issues = db.query(
+            Issue.rule_id,
+            Issue.title_de,
+            Issue.impact,
+            func.count(Issue.id).label('count')
+        ).filter(
+            Issue.page_id.in_(page_ids)
+        ).group_by(
+            Issue.rule_id, Issue.title_de, Issue.impact
+        ).all()
+
+        return {
+            issue.rule_id: {
+                'title_de': issue.title_de,
+                'impact': issue.impact.value,
+                'count': issue.count
+            }
+            for issue in issues
+        }
+
+    before_issues = get_issues_by_rule(before_page_ids)
+    after_issues = get_issues_by_rule(after_page_ids)
+
+    # Calculate changes
+    all_rule_ids = set(before_issues.keys()) | set(after_issues.keys())
+    issues_by_rule = []
+    issues_added = 0
+    issues_removed = 0
+
+    for rule_id in sorted(all_rule_ids):
+        before_data = before_issues.get(rule_id, {'count': 0, 'title_de': '', 'impact': 'minor'})
+        after_data = after_issues.get(rule_id, {'count': 0, 'title_de': '', 'impact': 'minor'})
+
+        count_before = before_data['count']
+        count_after = after_data['count']
+
+        if count_before == 0 and count_after > 0:
+            change = 'added'
+            issues_added += count_after
+        elif count_before > 0 and count_after == 0:
+            change = 'removed'
+            issues_removed += count_before
+        elif count_after > count_before:
+            change = 'added'
+            issues_added += (count_after - count_before)
+        elif count_after < count_before:
+            change = 'removed'
+            issues_removed += (count_before - count_after)
+        else:
+            change = 'unchanged'
+
+        issues_by_rule.append(IssueChange(
+            rule_id=rule_id,
+            title_de=after_data.get('title_de') or before_data.get('title_de', ''),
+            impact=after_data.get('impact') or before_data.get('impact', 'minor'),
+            change=change,
+            count_before=count_before,
+            count_after=count_after,
+        ))
+
+    # Sort by impact severity, then by absolute change
+    impact_order = {'critical': 0, 'serious': 1, 'moderate': 2, 'minor': 3}
+    issues_by_rule.sort(
+        key=lambda x: (impact_order.get(x.impact, 4), -abs(x.count_after - x.count_before))
+    )
+
+    # Calculate improvement percentage
+    score_before = scan_before.score or 0
+    score_after = scan_after.score or 0
+    score_change = score_after - score_before
+    improvement_percentage = None
+    if score_before > 0:
+        improvement_percentage = round((score_change / score_before) * 100, 1)
+
+    return ScanComparisonResponse(
+        before=ScanComparisonItem(
+            id=scan_before.id,
+            url=scan_before.url,
+            score=scan_before.score,
+            pages_scanned=scan_before.pages_scanned,
+            issues_count=scan_before.issues_count,
+            issues_by_impact=IssuesByImpact(
+                critical=scan_before.issues_critical or 0,
+                serious=scan_before.issues_serious or 0,
+                moderate=scan_before.issues_moderate or 0,
+                minor=scan_before.issues_minor or 0,
+            ),
+            completed_at=scan_before.completed_at,
+        ),
+        after=ScanComparisonItem(
+            id=scan_after.id,
+            url=scan_after.url,
+            score=scan_after.score,
+            pages_scanned=scan_after.pages_scanned,
+            issues_count=scan_after.issues_count,
+            issues_by_impact=IssuesByImpact(
+                critical=scan_after.issues_critical or 0,
+                serious=scan_after.issues_serious or 0,
+                moderate=scan_after.issues_moderate or 0,
+                minor=scan_after.issues_minor or 0,
+            ),
+            completed_at=scan_after.completed_at,
+        ),
+        score_change=round(score_change, 1),
+        issues_change=scan_after.issues_count - scan_before.issues_count,
+        pages_change=scan_after.pages_scanned - scan_before.pages_scanned,
+        issues_added=issues_added,
+        issues_removed=issues_removed,
+        issues_by_rule=issues_by_rule,
+        improvement_percentage=improvement_percentage,
+    )

@@ -8,6 +8,7 @@ import { Page, ElementHandle } from 'puppeteer';
 import { logger } from './logger.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import sharp from 'sharp';
 
 // UUID v4 regex pattern for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,6 +35,8 @@ export interface ScreenshotOptions {
   quality?: number;
   type?: 'png' | 'jpeg' | 'webp';
   padding?: number; // Padding around element
+  compress?: boolean; // Enable compression (default: true)
+  maxWidth?: number; // Max width for resizing (default: 1200)
 }
 
 export interface ElementScreenshotResult {
@@ -46,9 +49,64 @@ const DEFAULT_OPTIONS: ScreenshotOptions = {
   outputDir: './screenshots',
   fullPage: false,
   quality: 80,
-  type: 'png',
+  type: 'webp', // Changed to webp for better compression
   padding: 10,
+  compress: true,
+  maxWidth: 1200,
 };
+
+/**
+ * Compress an image using sharp
+ * Converts to WebP format for optimal compression while maintaining quality
+ */
+async function compressImage(
+  inputPath: string,
+  outputPath: string,
+  options: { quality?: number; maxWidth?: number } = {}
+): Promise<{ originalSize: number; compressedSize: number }> {
+  const quality = options.quality || 80;
+  const maxWidth = options.maxWidth || 1200;
+
+  try {
+    const inputBuffer = await fs.readFile(inputPath);
+    const originalSize = inputBuffer.length;
+
+    let sharpInstance = sharp(inputBuffer);
+
+    // Get image metadata to check dimensions
+    const metadata = await sharpInstance.metadata();
+
+    // Resize if wider than maxWidth while maintaining aspect ratio
+    if (metadata.width && metadata.width > maxWidth) {
+      sharpInstance = sharpInstance.resize(maxWidth, null, {
+        withoutEnlargement: true,
+        fit: 'inside',
+      });
+    }
+
+    // Convert to WebP with specified quality
+    const compressedBuffer = await sharpInstance
+      .webp({ quality, effort: 4 })
+      .toBuffer();
+
+    await fs.writeFile(outputPath, compressedBuffer);
+
+    const compressedSize = compressedBuffer.length;
+    const savings = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+
+    logger.debug(
+      `Image compressed: ${originalSize} -> ${compressedSize} bytes (${savings}% saved)`
+    );
+
+    return { originalSize, compressedSize };
+  } catch (error) {
+    logger.warn(`Failed to compress image, keeping original: ${error}`);
+    // If compression fails, copy the original file
+    await fs.copyFile(inputPath, outputPath);
+    const stats = await fs.stat(outputPath);
+    return { originalSize: stats.size, compressedSize: stats.size };
+  }
+}
 
 /**
  * Ensure output directory exists
@@ -168,17 +226,43 @@ export async function captureElementScreenshot(
       height: Math.min(boundingBox.height + padding * 2, pageHeight - boundingBox.y + padding),
     };
 
-    // Generate filename
-    const filename = generateFilename(scanId, ruleId, index, config.type || 'png');
+    // Generate filename (always use webp for compressed output)
+    const outputType = config.compress ? 'webp' : (config.type || 'webp');
+    const filename = generateFilename(scanId, ruleId, index, outputType);
     const filePath = path.join(config.outputDir, filename);
 
-    // Take screenshot
-    await page.screenshot({
-      path: filePath,
-      type: config.type,
-      quality: config.type === 'png' ? undefined : config.quality,
-      clip,
-    });
+    if (config.compress) {
+      // Capture to temporary PNG file first for best quality input
+      const tempFilename = `temp_${scanId}_${index}_${Date.now()}.png`;
+      const tempPath = path.join(config.outputDir, tempFilename);
+
+      await page.screenshot({
+        path: tempPath,
+        type: 'png',
+        clip,
+      });
+
+      // Compress and convert to WebP
+      await compressImage(tempPath, filePath, {
+        quality: config.quality,
+        maxWidth: config.maxWidth,
+      });
+
+      // Clean up temp file
+      try {
+        await fs.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    } else {
+      // Take screenshot directly without compression
+      await page.screenshot({
+        path: filePath,
+        type: config.type,
+        quality: config.type === 'png' ? undefined : config.quality,
+        clip,
+      });
+    }
 
     logger.debug(`Screenshot captured: ${filePath}`);
 
@@ -221,15 +305,42 @@ export async function captureFullPageScreenshot(
   try {
     await ensureDir(config.outputDir);
 
-    const filename = `${scanId}_fullpage_${pageIndex}_${Date.now()}.${config.type}`;
+    // Use webp for compressed output
+    const outputType = config.compress ? 'webp' : (config.type || 'webp');
+    const filename = `${scanId}_fullpage_${pageIndex}_${Date.now()}.${outputType}`;
     const filePath = path.join(config.outputDir, filename);
 
-    await page.screenshot({
-      path: filePath,
-      fullPage: true,
-      type: config.type,
-      quality: config.type === 'png' ? undefined : config.quality,
-    });
+    if (config.compress) {
+      // Capture to temporary PNG file first
+      const tempFilename = `temp_fullpage_${scanId}_${pageIndex}_${Date.now()}.png`;
+      const tempPath = path.join(config.outputDir, tempFilename);
+
+      await page.screenshot({
+        path: tempPath,
+        fullPage: true,
+        type: 'png',
+      });
+
+      // Compress and convert to WebP
+      await compressImage(tempPath, filePath, {
+        quality: config.quality,
+        maxWidth: config.maxWidth,
+      });
+
+      // Clean up temp file
+      try {
+        await fs.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    } else {
+      await page.screenshot({
+        path: filePath,
+        fullPage: true,
+        type: config.type,
+        quality: config.type === 'png' ? undefined : config.quality,
+      });
+    }
 
     logger.debug(`Full page screenshot captured: ${filePath}`);
 

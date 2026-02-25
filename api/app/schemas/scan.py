@@ -160,3 +160,40 @@ class ScanSummaryResponse(BaseModel):
     overall_score: float
     scan_duration_seconds: int
     completed_at: datetime
+
+
+class ScanComparisonItem(BaseModel):
+    """Schema for a single scan in comparison."""
+
+    id: UUID
+    url: str
+    score: Optional[float] = None
+    pages_scanned: int = 0
+    issues_count: int = 0
+    issues_by_impact: IssuesByImpact
+    completed_at: Optional[datetime] = None
+
+
+class IssueChange(BaseModel):
+    """Schema for issue changes between scans."""
+
+    rule_id: str
+    title_de: str
+    impact: str
+    change: str  # 'added', 'removed', 'unchanged'
+    count_before: int = 0
+    count_after: int = 0
+
+
+class ScanComparisonResponse(BaseModel):
+    """Schema for scan comparison response."""
+
+    before: ScanComparisonItem
+    after: ScanComparisonItem
+    score_change: float
+    issues_change: int
+    pages_change: int
+    issues_added: int
+    issues_removed: int
+    issues_by_rule: List[IssueChange]
+    improvement_percentage: Optional[float] = None

@@ -18,6 +18,7 @@ import {
   ScanJobData,
   JobProgress,
   getRedisConnection,
+  moveToDeadLetterQueue,
 } from './queue.js';
 import { PageScanResult, AccessibilityIssue, ScanSummary } from '../axe/types.js';
 import {
@@ -363,14 +364,35 @@ export function createScanWorker(concurrency: number = 2): Worker<ScanJobData, S
   worker.on('failed', async (job, err) => {
     logger.error(`Job ${job?.id} failed:`, err);
 
+    if (!job) return;
+
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    const maxAttempts = job.opts?.attempts || 3;
+    const isLastAttempt = job.attemptsMade >= maxAttempts;
+
     // Mark scan as failed in database
-    if (job?.data?.scanId) {
+    if (job.data?.scanId) {
       try {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         await markScanFailed(job.data.scanId, errorMessage);
       } catch (dbError) {
         logger.error(`Failed to mark scan as failed in database:`, dbError);
       }
+    }
+
+    // Move to dead letter queue if all retries exhausted
+    if (isLastAttempt) {
+      try {
+        await moveToDeadLetterQueue(job, errorMessage);
+        logger.warn(
+          `Job ${job.id} moved to DLQ after ${job.attemptsMade} failed attempts`
+        );
+      } catch (dlqError) {
+        logger.error(`Failed to move job to DLQ:`, dlqError);
+      }
+    } else {
+      logger.info(
+        `Job ${job.id} will retry (attempt ${job.attemptsMade}/${maxAttempts})`
+      );
     }
   });
 

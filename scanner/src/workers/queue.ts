@@ -11,6 +11,7 @@ import { logger } from '../utils/logger.js';
 // Queue names
 export const SCAN_QUEUE = 'accessibility-scans';
 export const REPORT_QUEUE = 'report-generation';
+export const DEAD_LETTER_QUEUE = 'accessibility-scans-dlq';
 
 // Job types
 export interface ScanJobData {
@@ -90,6 +91,125 @@ export async function closeRedisConnection(): Promise<void> {
 // Queue instances
 let scanQueue: Queue<ScanJobData> | null = null;
 let reportQueue: Queue<ReportJobData> | null = null;
+let deadLetterQueue: Queue<ScanJobData & { originalError: string; failedAt: string; attempts: number }> | null = null;
+
+/**
+ * Get dead letter queue for permanently failed jobs
+ */
+export function getDeadLetterQueue(): Queue<ScanJobData & { originalError: string; failedAt: string; attempts: number }> {
+  if (!deadLetterQueue) {
+    deadLetterQueue = new Queue(DEAD_LETTER_QUEUE, {
+      connection: getRedisConnection(),
+      defaultJobOptions: {
+        removeOnComplete: false, // Keep DLQ jobs for manual review
+        removeOnFail: false,
+      },
+    });
+
+    logger.info(`Dead letter queue "${DEAD_LETTER_QUEUE}" initialized`);
+  }
+
+  return deadLetterQueue;
+}
+
+/**
+ * Move a failed job to the dead letter queue
+ */
+export async function moveToDeadLetterQueue(
+  job: Job<ScanJobData>,
+  error: string
+): Promise<void> {
+  const dlq = getDeadLetterQueue();
+
+  await dlq.add(
+    `dlq-${job.data.scanId}`,
+    {
+      ...job.data,
+      originalError: error,
+      failedAt: new Date().toISOString(),
+      attempts: job.attemptsMade,
+    },
+    {
+      jobId: `dlq-${job.data.scanId}-${Date.now()}`,
+    }
+  );
+
+  logger.warn(`Job ${job.id} moved to dead letter queue after ${job.attemptsMade} attempts`);
+}
+
+/**
+ * Get dead letter queue status
+ */
+export async function getDeadLetterQueueStatus(): Promise<{
+  waiting: number;
+  failed: number;
+  jobs: Array<{
+    id: string | undefined;
+    scanId: string;
+    url: string;
+    error: string;
+    failedAt: string;
+    attempts: number;
+  }>;
+}> {
+  const dlq = getDeadLetterQueue();
+
+  const [waiting, jobs] = await Promise.all([
+    dlq.getWaitingCount(),
+    dlq.getJobs(['waiting', 'delayed'], 0, 100),
+  ]);
+
+  return {
+    waiting,
+    failed: waiting,
+    jobs: jobs.map((job) => ({
+      id: job.id,
+      scanId: job.data.scanId,
+      url: job.data.url,
+      error: job.data.originalError || 'Unknown error',
+      failedAt: job.data.failedAt || 'Unknown',
+      attempts: job.data.attempts || 0,
+    })),
+  };
+}
+
+/**
+ * Retry a job from the dead letter queue
+ */
+export async function retryFromDeadLetterQueue(
+  dlqJobId: string
+): Promise<Job<ScanJobData> | null> {
+  const dlq = getDeadLetterQueue();
+  const dlqJob = await dlq.getJob(dlqJobId);
+
+  if (!dlqJob) {
+    logger.warn(`DLQ job ${dlqJobId} not found`);
+    return null;
+  }
+
+  // Re-add to main queue
+  const mainQueue = getScanQueue();
+  const newJob = await mainQueue.add(
+    `retry-${dlqJob.data.scanId}`,
+    {
+      scanId: dlqJob.data.scanId,
+      url: dlqJob.data.url,
+      crawl: dlqJob.data.crawl,
+      maxPages: dlqJob.data.maxPages,
+      userId: dlqJob.data.userId,
+      options: dlqJob.data.options,
+    },
+    {
+      jobId: `retry-${dlqJob.data.scanId}-${Date.now()}`,
+    }
+  );
+
+  // Remove from DLQ
+  await dlqJob.remove();
+
+  logger.info(`Job ${dlqJobId} retried from DLQ, new job ID: ${newJob.id}`);
+  return newJob;
+}
 
 /**
  * Get scan queue
@@ -278,6 +398,11 @@ export async function shutdownQueues(): Promise<void> {
   if (reportQueue) {
     await reportQueue.close();
     reportQueue = null;
+  }
+
+  if (deadLetterQueue) {
+    await deadLetterQueue.close();
+    deadLetterQueue = null;
   }
 
   await closeRedisConnection();
