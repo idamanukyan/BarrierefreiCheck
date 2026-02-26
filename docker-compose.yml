@@ -96,18 +96,26 @@ services:
       - ./frontend:/app
       - /app/node_modules
     command: npm run dev -- --host
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Node.js Scanner Worker
   scanner:
     build:
       context: ./scanner
       dockerfile: Dockerfile
+    container_name: accessibilitychecker-scanner
     environment:
       - REDIS_URL=redis://redis:6379
       - S3_ENDPOINT=http://minio:9000
       - S3_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
       - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
       - DATABASE_URL=postgresql://accesscheck:accesscheck_dev@postgres:5432/accessibilitychecker
+      - HEALTH_PORT=8080
     depends_on:
       redis:
         condition: service_healthy
@@ -117,6 +125,12 @@ services:
       - ./scanner:/app
       - /app/node_modules
     command: npm run dev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Prometheus Metrics Collection
   prometheus:
