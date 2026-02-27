@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '../hooks/useTranslation';
 import { reportsApi } from '../services/api';
 import { Card, Button, Alert } from '../components/common';
+import { ShareButton } from '../components/reports';
 
 const Reports: React.FC = () => {
   const { t, formatDate, formatRelativeTime } = useTranslation();
@@ -88,7 +89,10 @@ const Reports: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {formatRelativeTime(report.createdAt)}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right space-x-2">
+                      {report.status === 'completed' && (
+                        <ShareButton reportId={report.id} />
+                      )}
                       <a
                         href={reportsApi.download(report.id)}
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"

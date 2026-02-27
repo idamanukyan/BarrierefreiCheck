@@ -312,5 +312,145 @@ export const dashboardApi = {
     }),
 };
 
+// Export API - generates download URLs for existing backend endpoints
+export const exportApi = {
+  issuesUrl: (scanId: string, format: 'csv' | 'json', includeHtml = false) =>
+    `${API_BASE_URL}/export/scans/${scanId}/issues?format=${format}&include_html=${includeHtml}`,
+
+  summaryUrl: (scanId: string) =>
+    `${API_BASE_URL}/export/scans/${scanId}/summary`,
+
+  pagesUrl: (scanId: string, format: 'csv' | 'json') =>
+    `${API_BASE_URL}/export/scans/${scanId}/pages?format=${format}`,
+};
+
+// Domains API
+import type { Domain, DomainListResponse, BulkCreateResponse, BulkDeleteResponse } from '../types';
+
+export interface CreateDomainData {
+  domain: string;
+  display_name?: string;
+  description?: string;
+}
+
+export const domainsApi = {
+  list: (includeInactive = false) =>
+    request<DomainListResponse>({
+      method: 'GET',
+      url: '/domains',
+      params: { include_inactive: includeInactive },
+    }),
+
+  create: (data: CreateDomainData) =>
+    request<Domain>({
+      method: 'POST',
+      url: '/domains',
+      data,
+    }),
+
+  bulkCreate: (domains: CreateDomainData[]) =>
+    request<BulkCreateResponse>({
+      method: 'POST',
+      url: '/domains/bulk',
+      data: { domains },
+    }),
+
+  get: (domainId: string) =>
+    request<Domain>({
+      method: 'GET',
+      url: `/domains/${domainId}`,
+    }),
+
+  update: (domainId: string, data: { display_name?: string; description?: string; is_active?: boolean }) =>
+    request<Domain>({
+      method: 'PATCH',
+      url: `/domains/${domainId}`,
+      data,
+    }),
+
+  delete: (domainId: string) =>
+    request<void>({
+      method: 'DELETE',
+      url: `/domains/${domainId}`,
+    }),
+
+  bulkDelete: (domainIds: string[]) =>
+    request<BulkDeleteResponse>({
+      method: 'DELETE',
+      url: '/domains',
+      params: { domain_ids: domainIds },
+    }),
+};
+
+// Share Links API
+export interface ShareLink {
+  id: string;
+  token_prefix: string;
+  name: string | null;
+  expires_at: string;
+  is_active: boolean;
+  access_count: number;
+  last_accessed_at: string | null;
+  created_at: string;
+}
+
+export interface ShareLinkCreateResponse {
+  link: ShareLink;
+  token: string;
+  share_url: string;
+}
+
+export interface ShareLinkListResponse {
+  items: ShareLink[];
+  total: number;
+}
+
+export interface SharedReportResponse {
+  report: {
+    id: string;
+    format: string;
+    language: string;
+    status: string;
+    created_at: string | null;
+  };
+  scan: {
+    id: string;
+    url: string;
+    score: number | null;
+    pages_scanned: number;
+    issues_count: number;
+    completed_at: string | null;
+  };
+  shared_by: string | null;
+  expires_at: string;
+}
+
+export const shareLinksApi = {
+  create: (reportId: string, data: { name?: string; expires_in_days?: number }) =>
+    request<ShareLinkCreateResponse>({
+      method: 'POST',
+      url: `/reports/${reportId}/share`,
+      data,
+    }),
+
+  list: (reportId: string) =>
+    request<ShareLinkListResponse>({
+      method: 'GET',
+      url: `/reports/${reportId}/share`,
+    }),
+
+  revoke: (reportId: string, linkId: string) =>
+    request<void>({
+      method: 'DELETE',
+      url: `/reports/${reportId}/share/${linkId}`,
+    }),
+
+  getShared: (token: string) =>
+    request<SharedReportResponse>({
+      method: 'GET',
+      url: `/shared/${token}`,
+    }),
+};
+
 export { setAuthToken, clearAuthToken };
 export default api;

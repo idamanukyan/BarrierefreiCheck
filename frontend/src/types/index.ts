@@ -180,3 +180,49 @@ export interface DashboardStats {
   issuesByWcag: IssuesByWcag;
   scoreHistory: Array<{ date: string; score: number }>;
 }
+
+// ============================================================================
+// Domain Types
+// ============================================================================
+
+export type DomainStatus = 'pending' | 'verified' | 'unverified';
+
+export interface Domain {
+  id: string;
+  domain: string;
+  display_name: string | null;
+  description: string | null;
+  status: DomainStatus;
+  total_scans: number;
+  last_scan_at: string | null;
+  last_score: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DomainListResponse {
+  items: Domain[];
+  total: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface BulkCreateResult {
+  domain: string;
+  success: boolean;
+  id?: string;
+  error?: string;
+}
+
+export interface BulkCreateResponse {
+  created: Domain[];
+  errors: BulkCreateResult[];
+  total_created: number;
+  total_errors: number;
+}
+
+export interface BulkDeleteResponse {
+  deleted_count: number;
+  deleted_ids: string[];
+}

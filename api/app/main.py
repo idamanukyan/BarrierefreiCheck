@@ -26,6 +26,8 @@ from app.routers.export import router as export_router
 from app.routers.api_keys import router as api_keys_router
 from app.routers.gdpr import router as gdpr_router
 from app.routers.admin import router as admin_router
+from app.routers.domains import router as domains_router
+from app.routers.share_links import router as share_links_router
 from app.services.rate_limiter import limiter, rate_limit_exceeded_handler
 from app.services.metrics import MetricsMiddleware, get_metrics
 from app.middleware import (
@@ -242,3 +244,5 @@ app.include_router(billing_router, prefix="/api/v1", tags=["Billing"])
 app.include_router(export_router, prefix="/api/v1", tags=["Export"])
 app.include_router(websocket_router, prefix="/api/v1", tags=["WebSocket"])
 app.include_router(admin_router, prefix="/api/v1", tags=["Admin"])
+app.include_router(domains_router, prefix="/api/v1/domains", tags=["Domains"])
+app.include_router(share_links_router, prefix="/api/v1", tags=["Share Links"])

@@ -25,6 +25,8 @@ const ScanDetail = React.lazy(() => import('./pages/ScanDetail'));
 const Reports = React.lazy(() => import('./pages/Reports'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Billing = React.lazy(() => import('./pages/Billing'));
+const Domains = React.lazy(() => import('./pages/Domains'));
+const SharedReport = React.lazy(() => import('./pages/SharedReport'));
 const Login = React.lazy(() => import('./pages/Login'));
 const Register = React.lazy(() => import('./pages/Register'));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
@@ -95,6 +97,9 @@ const App: React.FC = () => {
             <Routes>
             {/* Public landing page */}
             <Route path="/" element={<Landing />} />
+
+            {/* Public shared report page (no auth required) */}
+            <Route path="/shared/:token" element={<SharedReport />} />
 
             {/* Auth routes */}
             <Route
@@ -180,6 +185,16 @@ const App: React.FC = () => {
               }
             >
               <Route index element={<Billing />} />
+            </Route>
+            <Route
+              path="/domains"
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Domains />} />
             </Route>
 
             {/* 404 redirect */}

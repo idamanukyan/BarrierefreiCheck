@@ -16,6 +16,8 @@ from app.models.billing import (
     ReportFormat,
 )
 from app.models.api_key import APIKey, hash_api_key
+from app.models.domain import Domain, DomainStatus, extract_domain
+from app.models.shareable_link import ShareableReportLink, hash_share_token
 
 __all__ = [
     "User",
@@ -35,4 +37,9 @@ __all__ = [
     "ReportFormat",
     "APIKey",
     "hash_api_key",
+    "Domain",
+    "DomainStatus",
+    "extract_domain",
+    "ShareableReportLink",
+    "hash_share_token",
 ]
